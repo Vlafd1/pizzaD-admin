@@ -744,7 +744,20 @@ function saveModalRecipe() {
 }
 
 function exportJSONFile() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(RECIPES_DATA, null, 2));
+    const cleanData = {};
+    for (const [pizzaName, sizesObj] of Object.entries(RECIPES_DATA)) {
+        const validSizes = {};
+        for (const [cm, tk] of Object.entries(sizesObj)) {
+            if (isSizeComplete(tk)) {
+                validSizes[cm] = tk;
+            }
+        }
+        if (Object.keys(validSizes).length > 0) {
+            cleanData[pizzaName] = validSizes;
+        }
+    }
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanData, null, 2));
     const a = document.createElement('a');
     a.setAttribute("href", dataStr);
     a.setAttribute("download", "recipes.json");
