@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webki
 #oven .arch{position:absolute;left:6%;right:6%;top:12%;bottom:20%;border:10px solid #3b261a;border-radius:50% 50% 16px 16px/38% 38% 16px 16px;background:radial-gradient(#1c0b05,#050202);box-shadow:inset 0 0 70px #ff7a18aa,0 0 40px #ff6a0055}
 .fl{position:absolute;bottom:17%;width:17%;height:32%;transform-origin:50% 100%;background:radial-gradient(ellipse at 50% 100%,#fff3a0 0,#ffb21f 24%,#ff5a0a 54%,transparent 72%);will-change:transform;animation:fl .7s ease-in-out infinite alternate}
 @keyframes fl{from{transform:scale(.8,.75) skewX(-5deg)}to{transform:scale(1.1,1.2) skewX(6deg)}}
-#stage{position:relative;z-index:12;isolation:isolate}
+#stage{position:relative;z-index:12;isolation:isolate;\1}
 #stage::before{content:'';position:absolute;left:6%;right:6%;top:12%;bottom:-3%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.5),rgba(0,0,0,0));z-index:-1;pointer-events:none;transform:scale(var(--k,1));transition:transform .55s}
 #stage::after{content:'';position:absolute;inset:-6%;border-radius:50%;background:radial-gradient(circle,rgba(255,140,40,.5),rgba(255,140,40,0) 66%);z-index:-1;opacity:0;transition:opacity .5s;pointer-events:none}
 #stage.hot::after{opacity:1}
@@ -80,6 +80,11 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
  background:radial-gradient(ellipse 70% 45% at 50% 28%,rgba(255,138,42,.28),transparent 70%),radial-gradient(ellipse 80% 50% at 50% 100%,rgba(70,110,200,.22),transparent 70%),linear-gradient(180deg,#0b101b,#080b13);
  opacity:1;transition:opacity .5s ease}
 #startScr.out{opacity:0;pointer-events:none}
+#startScr .ss-pick{display:none;flex-direction:column;gap:12px;width:min(100%,320px)}
+#startScr .ss-pick.on{display:flex}
+#startScr .ss-pick h3{margin:0;font-size:1rem;font-weight:800;color:#fff;text-align:center;letter-spacing:.03em}
+#pickList{max-height:46vh;overflow:auto;padding:2px}
+#pickList small{display:block;margin-top:2px;font-size:.72rem;font-weight:600;opacity:.75}
 #startScr .ss-logo{font-size:3.6rem;filter:drop-shadow(0 8px 24px rgba(255,138,42,.45));animation:ssFloat 3.2s ease-in-out infinite}
 #startScr h2{margin:0 0 6px;font-size:1.35rem;font-weight:800;letter-spacing:.04em;color:#fff;text-align:center}
 #startScr .ss-btns{display:flex;flex-direction:column;gap:12px;width:min(100%,320px)}
@@ -163,19 +168,36 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
   <div id="startScr">
     <div class="ss-logo">🍕</div>
     <h2>Почати тренування:</h2>
-    <div class="ss-btns">
+    <div class="ss-btns" id="ssMenu">
       <button type="button" class="ss-main" data-mode="pizza">Піци</button>
       <button type="button" data-mode="custom" disabled>Нестандартні піци</button>
       <button type="button" data-mode="all" disabled>Всі формати піц</button>
+      <button type="button" id="ssPick">🎯 Обрати піцу для тренування</button>
     </div>
+    <div class="ss-pick" id="pickPanel"><h3>Оберіть піцу:</h3><div class="ss-btns" id="pickList"></div><button type="button" id="pickBack">← Назад</button></div>
   </div>
-  <script>try{if(['pizza'].includes(sessionStorage.getItem('pzMode')))document.getElementById('startScr').style.display='none'}catch(e){}</script>
+  <script>try{if(['pizza','focus'].includes(sessionStorage.getItem('pzMode')))document.getElementById('startScr').style.display='none'}catch(e){}</script>
   <div id="ordOv"><div id="ordBd"></div><div id="ordCard"><small>Нове замовлення</small><b></b></div></div>
   <div id="done"></div>
 </div>
 <svg id="spoon" viewBox="0 0 120 120"><line x1="30" y1="80" x2="112" y2="6" stroke="#aeb8c6" stroke-width="4" stroke-linecap="round"/><line x1="88" y1="28" x2="112" y2="6" stroke="#2f6fe0" stroke-width="7" stroke-linecap="round"/><circle id="spBowl" cx="30" cy="80" r="12" fill="#c0c8d4" stroke="#7d8a9c" stroke-width="2"/></svg>
 <script>
 const $=s=>document.querySelector(s),NS='http://www.w3.org/2000/svg',wait=ms=>new Promise(r=>setTimeout(r,ms));
+/* ---- 1) admin dashboard sync: recipes.json is requested first thing; missing / broken file or timeout -> built-in defaults ---- */
+const RECIPES_READY=Promise.race([
+ fetch('recipes.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{applyRecipes(d);return true}),
+ new Promise(r=>setTimeout(()=>r(false),2500))
+]).catch(()=>false);   /* always resolves: game start / first order wait for it */
+function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PPG} or a bare TECH object */
+ if(!d||typeof d!=='object')return;
+ const known=['TECH','SAUCES','SIZES','ING','POST','TOPS','PPG'],T=d.TECH||(known.some(k=>k in d)?null:d);
+ if(T)for(const[n,z]of Object.entries(T))if(z&&typeof z==='object')TECH[n]=z;   /* dashboard recipes replace / extend the built-in tech cards */
+ const mix=(dst,src)=>{for(const[k,v]of Object.entries(src||{}))dst[k]=v&&typeof v==='object'?Object.assign(dst[k]||{},v):v};
+ mix(SAUCES,d.SAUCES);mix(SIZES,d.SIZES);mix(PPG,d.PPG);
+ const byId=(arr,src)=>(src||[]).forEach(x=>{const o=arr.find(i=>i.id===x.id);if(o)Object.assign(o,x);else if(SH[x.id])arr.push(x)});   /* a new ingredient needs an SVG shape in SH */
+ byId(ING,d.ING);byId(POST,d.POST);byId(TOPS,d.TOPS);
+ ORDER_CATALOG[0].names=Object.keys(TECH);   /* order generator follows the dashboard catalog */
+}
 const rnd=s=>{s=Math.sin(s*127.1+311.7)*43758.5453;return s-Math.floor(s)};
 const SIZES={S:{g:200,cm:25},M:{g:250,cm:30},L:{g:400,cm:35}};
 const SAUCES={tomato:{n:'Томатний соус',g:60,c:'#c8321e'},cream:{n:'Вершковий соус',g:40,c:'#f3e6c4'},bbq:{n:'Соус BBQ',g:60,c:'#6b2a14'}};
@@ -228,7 +250,7 @@ const def=it=>it.id==='blu'?20:(it.id==='oli'||it.id==='mas')?10:it.cat==='che'?
 const hasMeat=()=>ING.some(i=>i.cat==='meat'&&S.qty[i.id]>0),hasCheese=()=>ING.some(i=>i.cat==='che'&&S.qty[i.id]>0);
 /* baking drives off 7% of the weight (moisture loss, "uzharka"); toppings added after baking are weighed on top of that */
 /* ---- Tech cards, grams. total = FINAL weight incl. post-bake herbs; sauce / herbs / total are reserved keys, every other key = ingredient id from ING ---- */
-let TECH={'Маргарита':{
+const TECH={'Маргарита':{
  25:{total:315,sauce:60,moz:50, tom:30,herbs:1},
  30:{total:420,sauce:60,moz:100,tom:50,herbs:1},
  35:{total:670,sauce:120,moz:150,tom:50,herbs:2}},
@@ -240,27 +262,6 @@ let TECH={'Маргарита':{
  25:{total:405,sauce:60, oni:15,chk:40, tom:15,moz:50, cuc:15,post:{bur:40},pat:{bur:'wave'}},   /* raw 395 -> baked 365 -> +40 = 405 */
  30:{total:570,sauce:60, oni:20,chk:80, tom:50,moz:60, cuc:30,post:{bur:40},pat:{bur:'wave'}},   /* raw 550 -> baked 530 -> +40 = 570 */
  35:{total:885,sauce:120,oni:60,chk:120,tom:50,moz:100,cuc:60,post:{bur:40},pat:{bur:'wave'}}}};   /* raw 910 -> baked 845 -> +40 = 885 */
-
-/* -------------------------------------------------------------------------- */
-/* АВТОМАТИЧНЕ ПІДКЛЮЧЕННЯ АДМІНКИ (Завантаження recipes.json з GitHub Pages) */
-/* -------------------------------------------------------------------------- */
-fetch('recipes.json')
-  .then(response => {
-    if (!response.ok) throw new Error('Network response was not ok');
-    return response.json();
-  })
-  .then(data => {
-    console.log('Техкарти та візуал успішно завантажені з адмін-панелі:', data);
-    if (data.techCards) {
-      TECH = data.techCards; // Оновлюємо техкарти на ті, що налаштовані в адмінці
-    }
-    // Якщо в даних є кастомні зображення (живі фото), їх можна також застосувати тут
-  })
-  .catch(error => {
-    console.log('Працюємо на стандартних дефолтних налаштуваннях тренажера', error);
-  });
-/* -------------------------------------------------------------------------- */
-
 /* ---- sauce application style (TK: pat:{sauceId:'wave'|'spiral'}) ---- */
 const PAT_N={wave:'хвиляста лінія',spiral:'спіральна лінія'};
 function patCheck(){const tk=TECH[recipeName()]?.[SIZES[S.size].cm];if(!tk?.pat)return[];
@@ -957,7 +958,7 @@ function devHTML(){
  return `<div class="pt-2 border-t border-white/10 font-bold">Відхилення від ТК: ${D.name} ${D.cm} см</div>
   <div class="text-xs text-slate-300">Сира: ${raw()} г → випічка −${raw()-baked()} г: ${baked()} г → + після випікання ${post()} г = ${total()} г</div>
   ${D.rows.map(r=>`<div class="flex justify-between gap-2 text-xs"><span>${r.n}: ${r.a} / ${r.s} г</span><b class="${col(r)}">${fm(r.d,' г')} (${fm(+r.p.toFixed(1),'%')})</b></div>`).join('')}
-  ${D.pats.map(r=>`<div class="text-xs ${r.ok?'text-emerald-300':'text-red-300'}">Стиль соусу «${r.n}» коригується: ${PAT_N[r.need]} — ${r.ok?'✓ дотримано':'✗ '+(r.got.length?'нанесено: '+r.got.join(', '):'не нанесено')}</div>`).join('')}
+  ${D.pats.map(r=>`<div class="text-xs ${r.ok?'text-emerald-300':'text-red-300'}">Стиль соусу «${r.n}»: ${PAT_N[r.need]} — ${r.ok?'✓ дотримано':'✗ '+(r.got.length?'нанесено: '+r.got.join(', '):'не нанесено')}</div>`).join('')}
   ${D.layers?`<div class="text-xs ${D.layers.ok?'text-emerald-300':'text-red-300'}">Шари: ${D.layers.need.map(id=>ING.find(i=>i.id===id).n).join(' → ')} — ${D.layers.ok?'✓ дотримано':'✗ порушено (у вас: '+(D.layers.seq.map(id=>ING.find(i=>i.id===id)?.n||id).join(' → ')||'—')+')'}</div>`:''}
   ${D.extra.length?`<div class="text-xs text-red-300">Додатково, не за ТК: ${D.extra.join('; ')}</div>`:''}`;
 }
@@ -982,7 +983,13 @@ const ORDER_CATALOG=[   /* extendable: push {kind:'Кальцоне',names:['…
 ];
 let ORDER=null;
 const pickOne=a=>a[Math.random()*a.length|0],orderText=o=>`${o.kind} "${o.name}" ${o.size} см`;
-function genOrder(){const p=pickOne(ORDER_CATALOG);return{kind:p.kind,name:pickOne(p.names),size:pickOne(p.sizes())}}
+function genOrder(){
+ const p=pickOne(ORDER_CATALOG),foc=currentGameMode==='focus'&&FOCUS&&TECH[FOCUS],name=foc?FOCUS:pickOne(p.names),sz=pizzaSizes(name),all=sz.length?sz:p.sizes();
+ let last=null;try{last=+sessionStorage.getItem('pzLastSize')}catch(e){}
+ const size=pickOne(foc&&all.length>1?all.filter(s=>s!==last):all);   /* targeted mode: only this pizza, random size, never the same size twice in a row */
+ try{sessionStorage.setItem('pzLastSize',size)}catch(e){}
+ return{kind:p.kind,name,size};
+}
 /* fade the docked order banner out while the pizza is boxed and delivered; showOrder() brings it back for the next order */
 function hideOrder(){
  $('#sizeWarn').style.display='none';
@@ -1059,23 +1066,33 @@ const sndBtn=$('#sndBtn'),sndIcon=()=>{sndBtn.textContent=SFX_MUTED?'🔇':'🔊
 sndBtn.addEventListener('click',()=>{SFX_MUTED=!SFX_MUTED;try{localStorage.setItem('pzMute',SFX_MUTED?'1':'0')}catch(e){}sndIcon()});
 document.addEventListener('pointerdown',sfxInit,{passive:true});
 /* ---- start screen / training flow ---- */
-const ACTIVE_MODES=['pizza'];   /* add ids here (and remove `disabled` on their buttons) to unlock a mode */
+const ACTIVE_MODES=['pizza','focus'];   /* 'focus' = targeted training on one chosen pizza */
+const focusStore={get:()=>{try{return sessionStorage.getItem('pzFocus')}catch(e){return null}},set:n=>{try{n?sessionStorage.setItem('pzFocus',n):sessionStorage.removeItem('pzFocus')}catch(e){}}};
+let FOCUS=null,PICK=[];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
+ pizzaSizes=n=>Object.keys(TECH[n]||{}).map(Number).filter(cm=>Object.values(SIZES).some(s=>s.cm===cm)).sort((a,b)=>a-b);   /* sizes that have a tech card */
+function openPick(){PICK=Object.keys(TECH);$('#pickList').innerHTML=PICK.map((n,i)=>`<button type="button" data-i="${i}">${esc(n)}<small>${pizzaSizes(n).join(' · ')} см</small></button>`).join('');$('#ssMenu').style.display='none';$('#pickPanel').classList.add('on')}
+const closePick=()=>{$('#pickPanel').classList.remove('on');$('#ssMenu').style.display=''};
+function startFocus(n){FOCUS=n;focusStore.set(n);closePick();startGame('focus')}
+$('#ssPick').addEventListener('click',()=>RECIPES_READY.then(openPick));   /* catalog is read after recipes.json has been applied */
+$('#pickBack').addEventListener('click',closePick);
+$('#pickList').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)startFocus(PICK[+b.dataset.i])});   /* add ids here (and remove `disabled` on their buttons) to unlock a mode */
 let currentGameMode=null;   /* 'pizza' | 'custom' | 'all' - pick per-mode catalogs inside genOrder() when they exist */
 const modeStore={get:()=>{try{return sessionStorage.getItem('pzMode')}catch(e){return null}},set:m=>{try{m?sessionStorage.setItem('pzMode',m):sessionStorage.removeItem('pzMode')}catch(e){}}};
 function restartSession(mode){                      /* fade out -> reset the whole session (reload) -> mode is restored on load */
- modeStore.set(mode);document.body.style.transition='opacity .35s ease';document.body.style.opacity=0;
+ modeStore.set(mode);if(!mode)focusStore.set(null);document.body.style.transition='opacity .35s ease';document.body.style.opacity=0;
  setTimeout(()=>location.reload(),370);
 }
 const nextOrder=()=>restartSession(currentGameMode);   /* "Нове замовлення" after a finished pizza: same mode, new order modal */
 const exitToMenu=()=>restartSession(null);              /* "В меню": back to the start screen */
 function startGame(m){
  if(currentGameMode||!ACTIVE_MODES.includes(m))return;currentGameMode=m;modeStore.set(m);const sc=$('#startScr');sc.classList.add('out');
- setTimeout(()=>{sc.style.display='none';showOrder()},520);
+ setTimeout(()=>{sc.style.display='none';RECIPES_READY.then(showOrder)},520);
 }
 document.querySelectorAll('#startScr [data-mode]').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.mode)));
 $('#exitBtn').addEventListener('click',exitToMenu);
 refresh();panel();
-if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();showOrder()}   /* training continues in the selected mode: new order right after the reload */
+if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();FOCUS=focusStore.get();RECIPES_READY.then(showOrder)}   /* training continues in the selected mode: new order right after the reload */
 </script>
 </body>
 </html>
