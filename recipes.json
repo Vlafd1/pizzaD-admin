@@ -1,4 +1,84 @@
 {
+  "1111": {
+    "25": {
+      "total": 320,
+      "sauce": 60,
+      "sauceId": "tomato",
+      "ings": [
+        {
+          "id": "moz",
+          "g": 10
+        },
+        {
+          "id": "blu",
+          "g": 10
+        },
+        {
+          "id": "mix",
+          "g": ""
+        }
+      ],
+      "post": [
+        {
+          "id": "bur",
+          "g": ""
+        }
+      ],
+      "pat": "none"
+    },
+    "30": {
+      "total": 430,
+      "sauce": 60,
+      "sauceId": "tomato",
+      "ings": [
+        {
+          "id": "moz",
+          "g": ""
+        },
+        {
+          "id": "blu",
+          "g": ""
+        },
+        {
+          "id": "mix",
+          "g": ""
+        }
+      ],
+      "post": [
+        {
+          "id": "bur",
+          "g": ""
+        }
+      ],
+      "pat": "none"
+    },
+    "35": {
+      "total": 670,
+      "sauce": 120,
+      "sauceId": "tomato",
+      "ings": [
+        {
+          "id": "moz",
+          "g": ""
+        },
+        {
+          "id": "blu",
+          "g": ""
+        },
+        {
+          "id": "mix",
+          "g": ""
+        }
+      ],
+      "post": [
+        {
+          "id": "bur",
+          "g": ""
+        }
+      ],
+      "pat": "none"
+    }
+  },
   "Маргарита": {
     "25": {
       "total": 315,
