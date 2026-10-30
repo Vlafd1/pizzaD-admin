@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pizza Studio Admin v2.4</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap">
+<style>
+:root{--ink:#e8edf5;--mut:#8b96a8;--acc:#ff7a18;--ok:#34c47c;color-scheme:dark}
+body{background:#0b0f17;color:var(--ink);font-family:Manrope,system-ui,sans-serif}
+</style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- AUTH SCREEN -->
+  <div id="authOverlay" class="absolute inset-0 z-50 bg-[#070a10] flex items-center justify-center p-4">
+    <div class="w-full max-w-md p-8 rounded-3xl bg-[#111726] border border-white/10 shadow-2xl flex flex-col items-center text-center gap-6">
+      <div class="w-16 h-16 rounded-2xl bg-[#ff7a18]/20 border border-[#ff7a18]/40 flex items-center justify-center text-3xl shadow-lg shadow-[#ff7a18]/20">🔒</div>
+      <div class="space-y-1">
+        <h2 class="text-xl font-extrabold text-white">Адмін-Панель ТК</h2>
+        <p class="text-xs text-slate-400">Введіть пароль доступу для керування ТК та візуалом</p>
+      </div>
+      <div class="w-full space-y-3">
+        <input type="password" id="passInput" placeholder="Пароль (за замовчуванням: 1234)" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-sm text-center text-white focus:outline-none focus:border-[#ff7a18] transition">
+        <button type="button" onclick="checkAuth()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#ff8a2a] to-[#ff6a00] text-[#1a0f05] font-extrabold text-sm shadow-lg shadow-[#ff7a18]/30 hover:opacity-95 transition">🔑 Увійти в систему</button>
+      </div>
+      <p id="authError" class="text-xs text-red-400 font-bold hidden">Невірний пароль! Спробуйте ще раз (1234)</p>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <header class="flex items-center justify-between px-6 py-4 bg-[#111726] border-b border-white/10 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-[#ff7a18]/20 border border-[#ff7a18]/40 flex items-center justify-center text-lg">🍕</div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-extrabold text-white tracking-wide">Pizza Studio Admin</h1>
+          <span class="px-2 py-0.5 rounded bg-white/10 text-[10px] font-bold text-[#ff7a18]">v2.4</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Конструктор Техкарт & Налаштування Графіки</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-3">
+      <div class="flex bg-[#0b0f19] p-1 rounded-xl border border-white/10">
+        <button type="button" id="tabBtnRecipes" onclick="switchTab('recipes')" class="px-5 py-2 rounded-lg font-bold text-xs transition bg-[#ff7a18] text-white shadow-md">Техкарти (ТК)</button>
+        <button type="button" id="tabBtnVisuals" onclick="switchTab('visuals')" class="px-5 py-2 rounded-lg font-bold text-xs text-slate-400 hover:text-white transition">Візуал Інгредієнтів</button>
+        <button type="button" id="tabBtnExport" onclick="switchTab('export')" class="px-5 py-2 rounded-lg font-bold text-xs text-slate-400 hover:text-white transition">Експорт / Імпорт</button>
+      </div>
+      <button type="button" onclick="logout()" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition">Вийти</button>
+    </div>
+  </header>
+
+  <main class="flex-1 overflow-hidden relative">
+    
+    <!-- TAB 1: RECIPES -->
+    <div id="tabRecipes" class="absolute inset-0 p-8 overflow-y-auto space-y-6">
+      <div class="p-6 rounded-3xl bg-[#111726] border border-white/10 shadow-xl flex items-center justify-between">
+        <div class="space-y-1">
+          <h2 class="text-xl font-extrabold text-white">Рецептури та Технічні Карти</h2>
+          <p class="text-xs text-slate-400">Управління рецептами, грамовками та дозуванням для 25, 30 та 35 см</p>
+        </div>
+        <button type="button" onclick="openModal()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 hover:opacity-95 transition flex items-center gap-2">
+          <span>+ Додати нову піцу</span>
+        </button>
+      </div>
+
+      <div id="recipesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <!-- Рецепти рендеряться з JS -->
+      </div>
+    </div>
+
+    <!-- TAB 2: VISUALS -->
+    <div id="tabVisuals" class="absolute inset-0 p-8 overflow-y-auto hidden space-y-6">
+      <div class="p-6 rounded-3xl bg-[#111726] border border-white/10 shadow-xl flex items-center justify-between">
+        <div class="space-y-1">
+          <h2 class="text-xl font-extrabold text-white">Візуал Інгредієнтів & Патернів</h2>
+          <p class="text-xs text-slate-400">Перегляд усіх варіацій продуктів з симулятора та завантаження власних живих фото</p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="p-6 rounded-2xl bg-[#111726] border border-white/10 space-y-4">
+          <h3 class="font-extrabold text-sm text-white">Оберіть продукт для налаштування</h3>
+          <select id="visualItemSelect" onchange="renderVisualVariations()" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-sm font-bold text-white focus:outline-none focus:border-[#ff7a18]">
+            <!-- Заповнюється з JS -->
+          </select>
+          <div class="p-4 rounded-xl bg-[#0b0f19] border border-white/10 space-y-2">
+            <span class="text-xs font-bold text-slate-400 uppercase">Інформація</span>
+            <p class="text-xs text-slate-300 leading-relaxed">Тут показано оригінальну векторну графіку кожного шматочка так, як він рендериться в тренажері. За бажанням ви можете замінити її на власне живе фото.</p>
+          </div>
+        </div>
+
+        <div class="md:col-span-2 p-6 rounded-2xl bg-[#111726] border border-white/10 space-y-4">
+          <h3 id="visualTitle" class="font-extrabold text-sm text-white">Варіації продукту</h3>
+          <div id="visualVariationsContainer" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Динамічні варіації та завантаження фото -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: EXPORT / IMPORT -->
+    <div id="tabExport" class="absolute inset-0 p-8 overflow-y-auto hidden space-y-6">
+      <div class="p-6 rounded-3xl bg-[#111726] border border-white/10 shadow-xl space-y-1">
+        <h2 class="text-xl font-extrabold text-white">Експорт та Імпорт Техкарт</h2>
+        <p class="text-xs text-slate-400">Перенесення готових техкарт у симулятор піци</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="p-6 rounded-2xl bg-[#111726] border border-white/10 space-y-4">
+          <h3 class="font-extrabold text-sm text-white">💾 Експорт конфігурації</h3>
+          <p class="text-xs text-slate-400">Завантажте файл `recipes.json` або скопіюйте JSON-код для вставки у ваш основний симулятор.</p>
+          <button type="button" onclick="exportJSONFile()" class="w-full py-3.5 rounded-xl bg-[#ff7a18] text-[#1a0f05] font-extrabold text-xs shadow-lg shadow-[#ff7a18]/20 hover:opacity-95 transition">Завантажити recipes.json</button>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-[#111726] border border-white/10 space-y-4">
+          <h3 class="font-extrabold text-sm text-white">📂 Імпорт конфігурації</h3>
+          <p class="text-xs text-slate-400">Завантажте раніше збережений файл `recipes.json`, щоб відновити або оновити техкарти.</p>
+          <input type="file" id="importFile" accept=".json" onchange="importJSONFile(event)" class="w-full text-xs text-slate-400 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-white/10 file:text-white hover:file:bg-white/20 transition cursor-pointer">
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="py-3 px-6 bg-[#111726] border-t border-white/10 text-center text-[11px] text-slate-500 font-semibold shrink-0">
+    Pizza Simulator Technical Card Admin Platform • Synchronized Weight Formula Standards
+  </footer>
+
+  <!-- MODAL EDIT / CREATE RECIPE -->
+  <div id="editModal" class="absolute inset-0 z-40 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl max-h-[90vh] bg-[#111726] border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-6 py-4 bg-[#0d1322] border-b border-white/10 flex items-center justify-between shrink-0">
+        <h3 id="modalTitle" class="text-base font-extrabold text-white">Редагувати піцу</h3>
+        <button type="button" onclick="closeModal()" class="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5 flex-1">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Назва піци</label>
+          <input type="text" id="mName" placeholder="наприклад: Гавайська" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-sm font-bold text-white focus:outline-none focus:border-[#ff7a18]">
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Параметри розміру піци</span>
+            <span class="text-[10px] text-slate-500 font-medium">Основа: 25см (200г), 30см (250г), 35см (400г)</span>
+          </div>
+          <div class="flex gap-2 bg-[#0b0f19] p-1 rounded-xl border border-white/10">
+            <button type="button" id="mTab25" onclick="setModalSize(25)" class="flex-1 py-2 rounded-lg text-xs font-extrabold transition">25 см (200g)</button>
+            <button type="button" id="mTab30" onclick="setModalSize(30)" class="flex-1 py-2 rounded-lg text-xs font-extrabold transition">30 см (250g)</button>
+            <button type="button" id="mTab35" onclick="setModalSize(35)" class="flex-1 py-2 rounded-lg text-xs font-extrabold transition">35 см (400g)</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Базовий соус (спільний для всіх розмірів)</label>
+            <select id="mSauceId" onchange="updateModalSauceId(this.value)" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-xs font-bold text-white focus:outline-none focus:border-[#ff7a18]">
+              <option value="tomato">Томатний соус</option>
+              <option value="cream">Вершковий соус</option>
+              <option value="bbq">Соус BBQ</option>
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Вага соусу (г)</label>
+            <input type="number" id="mSauceG" onchange="updateModalSauceG(this.value)" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-xs font-extrabold text-white text-center focus:outline-none focus:border-[#ff7a18]">
+          </div>
+        </div>
+
+        <!-- Інгредієнти до печі (Плашка вибору завжди ЗВЕРХУ) -->
+        <div class="p-4 rounded-xl bg-[#0b0f19] border border-white/5 space-y-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Інгредієнти до печі</span>
+            <p class="text-[10px] text-slate-500 font-medium mt-0.5">Склад синхронізується для 25, 30 та 35 см (вага вводиться окремо)</p>
+          </div>
+          <div class="relative tree-picker mb-3" data-picker="pre">
+            <button type="button" onclick="togglePickerMenu('pre', event)" class="w-full px-4 py-3 rounded-xl bg-[#111726] hover:bg-[#161f33] border border-dashed border-white/15 hover:border-[#ff7a18]/60 text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-between">
+              <span class="italic">Обрати інгредієнт</span>
+              <span id="pickerArrow-pre" class="text-[10px] text-slate-400 transition-transform">▼</span>
+            </button>
+            <div id="pickerMenu-pre" class="hidden absolute left-0 right-0 top-full mt-1.5 z-30 bg-[#111726] border border-white/15 rounded-xl shadow-2xl overflow-hidden divide-y divide-white/5 max-h-64 overflow-y-auto"></div>
+          </div>
+          <div id="mPreRows" class="space-y-2"></div>
+        </div>
+
+        <!-- Інгредієнти після печі (Плашка вибору завжди ЗВЕРХУ) -->
+        <div class="p-4 rounded-xl bg-[#0b0f19] border border-white/5 space-y-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Інгредієнти після печі</span>
+            <p class="text-[10px] text-slate-500 font-medium mt-0.5">Зелень та спеції, соуси-топінги</p>
+          </div>
+          <div class="relative tree-picker mb-3" data-picker="post">
+            <button type="button" onclick="togglePickerMenu('post', event)" class="w-full px-4 py-3 rounded-xl bg-[#111726] hover:bg-[#161f33] border border-dashed border-white/15 hover:border-[#ff7a18]/60 text-xs font-bold text-slate-400 hover:text-white transition flex items-center justify-between">
+              <span class="italic">Обрати інгредієнт</span>
+              <span id="pickerArrow-post" class="text-[10px] text-slate-400 transition-transform">▼</span>
+            </button>
+            <div id="pickerMenu-post" class="hidden absolute left-0 right-0 top-full mt-1.5 z-30 bg-[#111726] border border-white/15 rounded-xl shadow-2xl overflow-hidden divide-y divide-white/5 max-h-64 overflow-y-auto"></div>
+          </div>
+          <div id="mPostRows" class="space-y-2"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div id="mPatContainer" class="space-y-1.5 hidden">
+            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Паттерн соусу після печі</label>
+            <select id="mPatSelect" onchange="updateModalPat(this.value)" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-xs font-bold text-white focus:outline-none focus:border-[#ff7a18]">
+              <option value="none">Без патерну</option>
+              <option value="wave">Хвиляста лінія</option>
+              <option value="spiral">Спіральна лінія</option>
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Цільова фінальна вага ТК (г)</label>
+            <input type="number" id="mTotalG" onchange="updateModalTotalG(this.value)" class="w-full px-4 py-3 rounded-xl bg-[#0b0f19] border border-white/15 text-xs font-extrabold text-white text-center focus:outline-none focus:border-[#ff7a18]">
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 bg-[#0d1322] border-t border-white/10 flex justify-end gap-3 shrink-0">
+        <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition">Скасувати</button>
+        <button type="button" onclick="saveModalRecipe()" class="px-6 py-2.5 rounded-xl bg-[#ff7a18] text-[#1a0f05] text-xs font-extrabold shadow-lg shadow-[#ff7a18]/20 hover:opacity-95 transition">Зберегти рецепт</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const INGREDIENTS_CATALOG = {
+    pre: [
+        { cat: "М'ясо", items: [
+            { id: "pep", name: "Пепероні" },
+            { id: "sal", name: "Салями" },
+            { id: "shy", name: "Шинка" },
+            { id: "bac", name: "Бекон слайсами" },
+            { id: "bal", name: "Балик слайсами" },
+            { id: "hun", name: "Мисливські ковбаски" },
+            { id: "chk", name: "Копчене куряче філе кубиком" }
+        ]},
+        { cat: "Сири", items: [
+            { id: "moz", name: "Моцарела (кубиком)" },
+            { id: "ched", name: "Чеддер (пластинками)" },
+            { id: "blu", name: "Сир з блакитною пліснявою" },
+            { id: "mix", name: "Мікс сирів" }
+        ]},
+        { cat: "Овочі", items: [
+            { id: "chi", name: "Перець чілі" },
+            { id: "cor", name: "Кукурудза" },
+            { id: "oni", name: "Маринована цибуля" },
+            { id: "pin", name: "Ананас" },
+            { id: "cuc", name: "Мариновані огірки" },
+            { id: "tom", name: "Помідор" },
+            { id: "bel", name: "Болгарський перець" },
+            { id: "oli", name: "Оливки" },
+            { id: "mas", name: "Маслини" },
+            { id: "mus", name: "Гриби печериці" }
+        ]}
+    ],
+    post: [
+        { cat: "Зелень та спеції", items: [
+            { id: "spi", name: "Італійські трави" },
+            { id: "aru", name: "Рукола" },
+            { id: "gon", name: "Зелена цибуля" },
+            { id: "ice", name: "Айсберг" }
+        ]},
+        { cat: "Соуси топінги", items: [
+            { id: "bur", name: "Соус Бургер" },
+            { id: "ter", name: "Теріякі" },
+            { id: "sch", name: "Світ чилі" },
+            { id: "cez", name: "Цезаріо" }
+        ]}
+    ]
+};
+
+const BASE_SAUCES = {
+    tomato: "Томатний соус",
+    cream: "Вершковий соус",
+    bbq: "Соус BBQ"
+};
+
+let RECIPES_DATA = {
+    'Маргарита': {
+        25: { total: 315, sauce: 60, sauceId: 'tomato', ings: [{id:'moz', g:50}, {id:'tom', g:30}], post: [{id:'spi', g:1}], pat:'none' },
+        30: { total: 420, sauce: 60, sauceId: 'tomato', ings: [{id:'moz', g:100}, {id:'tom', g:50}], post: [{id:'spi', g:1}], pat:'none' },
+        35: { total: 670, sauce: 120, sauceId: 'tomato', ings: [{id:'moz', g:150}, {id:'tom', g:50}], post: [{id:'spi', g:2}], pat:'none' }
+    },
+    'Пепероні': {
+        25: { total: 325, sauce: 60, sauceId: 'tomato', ings: [{id:'pep', g:30}, {id:'moz', g:60}], post: [{id:'spi', g:1}], pat:'none' },
+        30: { total: 430, sauce: 60, sauceId: 'tomato', ings: [{id:'moz', g:50}, {id:'pep', g:60}, {id:'moz', g:50}], post: [{id:'spi', g:1}], pat:'none' },
+        35: { total: 670, sauce: 120, sauceId: 'tomato', ings: [{id:'pep', g:80}, {id:'moz', g:120}], post: [{id:'spi', g:1}], pat:'none' }
+    },
+    'Бір Бургер': {
+        25: { total: 405, sauce: 60, sauceId: 'tomato', ings: [{id:'oni', g:15}, {id:'chk', g:40}, {id:'tom', g:15}, {id:'moz', g:50}, {id:'cuc', g:15}], post: [{id:'bur', g:40}], pat:'wave' },
+        30: { total: 570, sauce: 60, sauceId: 'tomato', ings: [{id:'oni', g:20}, {id:'chk', g:80}, {id:'tom', g:50}, {id:'moz', g:60}, {id:'cuc', g:30}], post: [{id:'bur', g:40}], pat:'wave' },
+        35: { total: 885, sauce: 120, sauceId: 'tomato', ings: [{id:'oni', g:60}, {id:'chk', g:120}, {id:'tom', g:50}, {id:'moz', g:100}, {id:'cuc', g:60}], post: [{id:'bur', g:40}], pat:'wave' }
+    }
+};
+
+let editingPizzaName = null;
+let modalBuffer = null;
+let modalActiveSize = 25;
+let expandedCards = {};
+let pickerState = {
+    pre: { open: false, cats: {} },
+    post: { open: false, cats: {} }
+};
+
+let customIngredientPhotos = {};
+
+try {
+    const saved = localStorage.getItem('pizza_simulator_recipes');
+    if (saved) RECIPES_DATA = JSON.parse(saved);
+    const savedPhotos = localStorage.getItem('pizza_custom_photos');
+    if (savedPhotos) customIngredientPhotos = JSON.parse(savedPhotos);
+} catch (e) {}
+
+function saveAllLocal() {
+    try {
+        localStorage.setItem('pizza_simulator_recipes', JSON.stringify(RECIPES_DATA));
+        localStorage.setItem('pizza_custom_photos', JSON.stringify(customIngredientPhotos));
+    } catch (e) {}
+}
+
+function checkAuth() {
+    const p = document.getElementById('passInput').value;
+    if (p === '1234') {
+        document.getElementById('authOverlay').style.display = 'none';
+        renderRecipesGrid();
+    } else {
+        document.getElementById('authError').classList.remove('hidden');
+    }
+}
+
+const passInput = document.getElementById('passInput');
+if (passInput) {
+    passInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') checkAuth();
+    });
+}
+
+function logout() {
+    if (passInput) passInput.value = '';
+    document.getElementById('authOverlay').style.display = 'flex';
+}
+
+function switchTab(tab) {
+    ['Recipes', 'Visuals', 'Export'].forEach(t => {
+        const btn = document.getElementById(`tabBtn${t}`);
+        const el = document.getElementById(`tab${t}`);
+        if (!btn || !el) return;
+        if (t.toLowerCase() === tab) {
+            btn.className = "px-5 py-2 rounded-lg font-bold text-xs transition bg-[#ff7a18] text-white shadow-md";
+            el.classList.remove('hidden');
+        } else {
+            btn.className = "px-5 py-2 rounded-lg font-bold text-xs text-slate-400 hover:text-white transition";
+            el.classList.add('hidden');
+        }
+    });
+
+    if (tab === 'visuals') {
+        populateVisualSelect();
+        renderVisualVariations();
+    }
+}
+
+function getIngName(id) {
+    if (BASE_SAUCES[id]) return BASE_SAUCES[id];
+    for (const group of [...INGREDIENTS_CATALOG.pre, ...INGREDIENTS_CATALOG.post]) {
+        const item = group.items.find(x => x.id === id);
+        if (item) return item.name;
+    }
+    return id;
+}
+
+function getIngCat(id) {
+    for (const group of [...INGREDIENTS_CATALOG.pre, ...INGREDIENTS_CATALOG.post]) {
+        if (group.items.some(x => x.id === id)) return group.cat;
+    }
+    return '';
+}
+
+function isSizeComplete(tk) {
+    if (!tk) return false;
+    if (!(Number(tk.sauce) > 0) || !(Number(tk.total) > 0)) return false;
+    const ings = tk.ings || [];
+    const post = tk.post || [];
+    if (ings.length === 0) return false;
+    const allPreValid = ings.every(item => item && item.id && String(item.id).trim() !== '' && Number(item.g) > 0);
+    const allPostValid = post.every(item => item && item.id && String(item.id).trim() !== '' && Number(item.g) > 0);
+    return allPreValid && allPostValid;
+}
+
+function togglePizzaCard(name) {
+    expandedCards[name] = !expandedCards[name];
+    renderRecipesGrid();
+}
+
+function renderRecipesGrid() {
+    const grid = document.getElementById('recipesGrid');
+    if (!grid) return;
+    grid.innerHTML = Object.entries(RECIPES_DATA).map(([name, sizes]) => {
+        const isExpanded = !!expandedCards[name];
+        const safeName = name.replace(/'/g, "\\'");
+
+        const sizeBadgesHTML = [25, 30, 35].map(cm => {
+            const valid = isSizeComplete(sizes[cm]);
+            return valid
+                ? `<span class="px-2 py-0.5 rounded-md bg-[#ff7a18] text-white text-[11px] font-extrabold shadow-sm shadow-[#ff7a18]/30 flex items-center gap-0.5">✓ ${cm}</span>`
+                : `<span class="px-2 py-0.5 rounded-md bg-[#0b0f19] border border-white/10 text-slate-500 text-[11px] font-bold flex items-center gap-0.5">${cm}</span>`;
+        }).join('');
+
+        const detailsHTML = [25, 30, 35].map(cm => {
+            const tk = sizes[cm];
+            if (!tk) return '';
+            const valid = isSizeComplete(tk);
+            const dough = cm === 25 ? 200 : cm === 30 ? 250 : 400;
+            const preSum = (tk.ings || []).reduce((a, b) => a + (Number(b.g) || 0), 0);
+            const postSum = (tk.post || []).reduce((a, b) => a + (Number(b.g) || 0), 0);
+            const raw = dough + (Number(tk.sauce) || 0) + preSum;
+            const baked = (Number(tk.total) || 0) - postSum;
+
+            const postLabel = (tk.post || []).filter(p => p.id).map(p => `${getIngName(p.id)} (${p.g || 0}г)`).join(', ') || 'без топінгів';
+
+            return `
+                <div class="p-3 rounded-xl bg-[#0b0f19] border ${valid ? 'border-[#ff7a18]/30' : 'border-white/5 opacity-60'} space-y-1">
+                    <div class="flex justify-between items-center text-[11px] font-bold">
+                        <span class="${valid ? 'text-white' : 'text-slate-400'}">Розмір ${cm} см</span>
+                        <span class="px-1.5 py-0.5 rounded ${valid ? 'bg-[#ff7a18]/20 text-[#ff7a18]' : 'bg-white/5 text-slate-400'}">${tk.total || 0}г</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Сира: <b class="text-white">${raw}г</b> (Основа ${dough}г + Соус ${tk.sauce || 0}г + Начинка ${preSum}г)</p>
+                    <p class="text-[10px] text-emerald-400">Після печі: <b>${baked}г</b> + ${postLabel}</p>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="rounded-2xl bg-[#111726] border border-white/10 shadow-xl overflow-hidden self-start transition">
+                <div onclick="togglePizzaCard('${safeName}')" class="p-4 cursor-pointer hover:bg-white/[0.02] transition space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-extrabold text-white flex items-center gap-1.5 truncate">
+                            <span>🍕</span> <span class="truncate">${name}</span>
+                        </h3>
+                        <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                            <button type="button" onclick="openModal('${safeName}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition" title="Редагувати">✏️</button>
+                            <button type="button" onclick="deletePizza('${safeName}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition" title="Видалити">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-0.5">
+                        <div class="flex items-center gap-1.5">
+                            ${sizeBadgesHTML}
+                        </div>
+                        <span class="text-[11px] font-bold text-slate-400 flex items-center gap-0.5">
+                            <span>${isExpanded ? 'Згорнути' : 'Деталі'}</span>
+                            <span class="inline-block transition-transform text-[9px] ${isExpanded ? 'rotate-180' : ''}">▼</span>
+                        </span>
+                    </div>
+                </div>
+
+                ${isExpanded ? `
+                    <div class="px-4 pb-4 pt-1.5 border-t border-white/10 space-y-2.5 bg-[#0d121f]">
+                        ${detailsHTML}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function deletePizza(name) {
+    delete RECIPES_DATA[name];
+    saveAllLocal();
+    renderRecipesGrid();
+}
+
+function openModal(name = null) {
+    editingPizzaName = name;
+    pickerState = {
+        pre: { open: false, cats: {} },
+        post: { open: false, cats: {} }
+    };
+
+    if (name && RECIPES_DATA[name]) {
+        document.getElementById('modalTitle').textContent = `Редагувати: ${name}`;
+        document.getElementById('mName').value = name;
+        modalBuffer = JSON.parse(JSON.stringify(RECIPES_DATA[name]));
+        [25, 30, 35].forEach(sz => {
+            if (modalBuffer[sz]) {
+                modalBuffer[sz].ings = (modalBuffer[sz].ings || []).filter(x => x && x.id);
+                modalBuffer[sz].post = (modalBuffer[sz].post || []).filter(x => x && x.id);
+            }
+        });
+    } else {
+        document.getElementById('modalTitle').textContent = "Додати нову піцу";
+        document.getElementById('mName').value = "";
+        modalBuffer = {
+            25: { total: 320, sauce: 60, sauceId: 'tomato', ings: [], post: [], pat:'none' },
+            30: { total: 430, sauce: 60, sauceId: 'tomato', ings: [], post: [], pat:'none' },
+            35: { total: 670, sauce: 120, sauceId: 'tomato', ings: [], post: [], pat:'none' }
+        };
+    }
+
+    modalActiveSize = 25;
+    renderModalForm();
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+function setModalSize(cm) {
+    modalActiveSize = cm;
+    renderModalForm();
+}
+
+function renderModalForm() {
+    const doughMap = { 25: '200g', 30: '250g', 35: '400g' };
+    [25, 30, 35].forEach(size => {
+        const btn = document.getElementById(`mTab${size}`);
+        const complete = isSizeComplete(modalBuffer[size]);
+        const dot = complete ? `<span class="inline-block w-2 h-2 rounded-full bg-emerald-300 ml-1"></span>` : '';
+        btn.innerHTML = `${size} см (${doughMap[size]})${dot}`;
+        if (size === modalActiveSize) {
+            btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition bg-[#ff7a18] text-white shadow-md flex items-center";
+        } else {
+            btn.className = `px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center ${complete ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'text-slate-400 hover:text-white bg-white/5'}`;
+        }
+    });
+
+    const tk = modalBuffer[modalActiveSize];
+    document.getElementById('mSauceId').value = tk.sauceId || 'tomato';
+    document.getElementById('mSauceG').value = tk.sauce !== undefined ? tk.sauce : 60;
+    document.getElementById('mTotalG').value = tk.total !== undefined ? tk.total : '';
+    
+    const patSelect = document.getElementById('mPatSelect');
+    const patContainer = document.getElementById('mPatContainer');
+    patSelect.value = tk.pat || 'none';
+
+    const hasToppingSauce = (tk.post || []).some(item => ['bur', 'ter', 'sch', 'cez'].includes(item.id));
+    if (hasToppingSauce) {
+        patContainer.classList.remove('hidden');
+    } else {
+        patContainer.classList.add('hidden');
+        tk.pat = 'none';
+    }
+
+    renderAddedRows('pre', tk.ings || []);
+    renderAddedRows('post', tk.post || []);
+
+    renderPickerTree('pre');
+    renderPickerTree('post');
+}
+
+function renderAddedRows(type, list) {
+    const container = document.getElementById(type === 'pre' ? 'mPreRows' : 'mPostRows');
+    if (!list.length) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const counts = {};
+    list.forEach(item => { counts[item.id] = (counts[item.id] || 0) + 1; });
+    const seen = {};
+
+    container.innerHTML = list.map((item, idx) => {
+        seen[item.id] = (seen[item.id] || 0) + 1;
+        const isLayered = counts[item.id] > 1;
+        const layerBadge = isLayered
+            ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold">Шар ${seen[item.id]}</span>`
+            : '';
+        const catName = getIngCat(item.id);
+        const hasWeight = Number(item.g) > 0;
+
+        return `
+            <div class="flex items-center gap-2.5">
+                <div class="flex-1 px-3.5 py-2.5 rounded-xl bg-[#111726] border border-white/10 flex items-center justify-between min-w-0">
+                    <div class="flex items-center gap-2 truncate">
+                        <span class="w-5 h-5 rounded-md bg-white/5 text-slate-400 text-[10px] font-extrabold flex items-center justify-center shrink-0">${idx + 1}</span>
+                        <span class="text-xs font-bold text-white truncate">${getIngName(item.id)}</span>
+                        ${layerBadge}
+                    </div>
+                    <span class="text-[10px] font-semibold text-slate-500 ml-2 shrink-0">${catName}</span>
+                </div>
+                <div class="relative w-24 shrink-0">
+                    <input type="number" min="0" placeholder="Вага" value="${item.g !== '' && item.g !== undefined ? item.g : ''}" oninput="updateModalRowG('${type}', ${idx}, this.value)" class="w-full pl-3 pr-6 py-2.5 rounded-xl bg-[#111726] border ${hasWeight ? 'border-white/15 text-white' : 'border-amber-500/50 text-amber-300'} text-xs font-extrabold text-center focus:outline-none focus:border-[#ff7a18]">
+                    <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 pointer-events-none">г</span>
+                </div>
+                <button type="button" onclick="removeModalRow('${type}', ${idx})" class="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 transition shrink-0" title="Видалити рядок">🗑️</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderPickerTree(type) {
+    const menu = document.getElementById(`pickerMenu-${type}`);
+    const arrow = document.getElementById(`pickerArrow-${type}`);
+    const state = pickerState[type];
+
+    if (!menu || !arrow) return;
+
+    if (state.open) {
+        menu.classList.remove('hidden');
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        menu.classList.add('hidden');
+        arrow.style.transform = 'rotate(0deg)';
+    }
+
+    const catalog = INGREDIENTS_CATALOG[type];
+    const currentList = (type === 'pre' ? modalBuffer[modalActiveSize].ings : modalBuffer[modalActiveSize].post) || [];
+
+    menu.innerHTML = catalog.map(group => {
+        const isCatOpen = !!state.cats[group.cat];
+        const itemsHTML = group.items.map(item => {
+            const addedCount = currentList.filter(x => x.id === item.id).length;
+            const countBadge = addedCount > 0
+                ? `<span class="px-2 py-0.5 rounded-full bg-[#ff7a18] text-[#1a0f05] text-[10px] font-extrabold">Додано ×${addedCount}</span>`
+                : `<span class="text-[11px] font-bold text-slate-500 group-hover:text-[#ff7a18]">+ Додати</span>`;
+
+            return `
+                <button type="button" onclick="pickIngredient('${type}', '${item.id}', event)" class="group w-full px-4 py-2.5 text-left text-xs font-semibold hover:bg-[#ff7a18]/15 text-slate-200 hover:text-white transition flex items-center justify-between border-t border-white/[0.04]">
+                    <span>${item.name}</span>
+                    ${countBadge}
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div>
+                <button type="button" onclick="togglePickerCategory('${type}', &quot;${group.cat}&quot;, event)" class="w-full px-4 py-2.5 bg-[#0d1322] hover:bg-[#151e32] text-xs font-extrabold text-white transition flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <span class="text-[#ff7a18] text-[10px] transition-transform inline-block ${isCatOpen ? 'rotate-90' : ''}">▶</span>
+                        <span>${group.cat}</span>
+                    </span>
+                    <span class="text-[10px] font-bold text-slate-500">${group.items.length}</span>
+                </button>
+                <div class="${isCatOpen ? 'block' : 'hidden'} bg-[#090d16]">
+                    ${itemsHTML}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function togglePickerMenu(type, event) {
+    event.stopPropagation();
+    const other = type === 'pre' ? 'post' : 'pre';
+    pickerState[other].open = false;
+    pickerState[type].open = !pickerState[type].open;
+    renderPickerTree('pre');
+    renderPickerTree('post');
+}
+
+function togglePickerCategory(type, catName, event) {
+    event.stopPropagation();
+    pickerState[type].cats[catName] = !pickerState[type].cats[catName];
+    renderPickerTree(type);
+}
+
+function pickIngredient(type, id, event) {
+    event.stopPropagation();
+    [25, 30, 35].forEach(size => {
+        const list = type === 'pre' ? modalBuffer[size].ings : modalBuffer[size].post;
+        list.push({ id: id, g: '' });
+    });
+    
+    const tk = modalBuffer[modalActiveSize];
+    const hasToppingSauce = (tk.post || []).some(item => ['bur', 'ter', 'sch', 'cez'].includes(item.id));
+    const patContainer = document.getElementById('mPatContainer');
+    if (hasToppingSauce) {
+        patContainer.classList.remove('hidden');
+    } else {
+        patContainer.classList.add('hidden');
+        tk.pat = 'none';
+    }
+
+    renderAddedRows(type, type === 'pre' ? tk.ings : tk.post);
+    renderPickerTree(type);
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.tree-picker')) {
+        if (pickerState.pre.open || pickerState.post.open) {
+            pickerState.pre.open = false;
+            pickerState.post.open = false;
+            if (modalBuffer) {
+                renderPickerTree('pre');
+                renderPickerTree('post');
+            }
+        }
+    }
+});
+
+function removeModalRow(type, index) {
+    [25, 30, 35].forEach(size => {
+        const list = type === 'pre' ? modalBuffer[size].ings : modalBuffer[size].post;
+        list.splice(index, 1);
+    });
+    renderModalForm();
+}
+
+function updateModalRowG(type, index, value) {
+    const list = type === 'pre' ? modalBuffer[modalActiveSize].ings : modalBuffer[modalActiveSize].post;
+    if (list[index]) {
+        list[index].g = value !== '' ? Number(value) : '';
+    }
+}
+
+function updateModalSauceId(val) {
+    [25, 30, 35].forEach(sz => {
+        modalBuffer[sz].sauceId = val;
+        if (val === 'cream') {
+            modalBuffer[sz].sauce = (sz === 35) ? 80 : 40;
+        } else {
+            modalBuffer[sz].sauce = (sz === 35) ? 120 : 60;
+        }
+    });
+    renderModalForm();
+}
+
+function updateModalSauceG(val) { 
+    const parsed = val !== '' ? Number(val) : '';
+    [25, 30, 35].forEach(sz => {
+        modalBuffer[sz].sauce = parsed;
+    });
+    renderModalForm(); 
+}
+
+function updateModalTotalG(val) { modalBuffer[modalActiveSize].total = val !== '' ? Number(val) : ''; renderModalForm(); }
+function updateModalPat(val) { modalBuffer[modalActiveSize].pat = val; }
+
+function saveModalRecipe() {
+    const name = document.getElementById('mName').value.trim();
+    if (!name) return;
+
+    if (editingPizzaName && editingPizzaName !== name) {
+        delete RECIPES_DATA[editingPizzaName];
+    }
+
+    RECIPES_DATA[name] = JSON.parse(JSON.stringify(modalBuffer));
+    saveAllLocal();
+    closeModal();
+    renderRecipesGrid();
+}
+
+function exportJSONFile() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(RECIPES_DATA, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute("href", dataStr);
+    a.setAttribute("download", "recipes.json");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function importJSONFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        try {
+            const parsed = JSON.parse(evt.target.result);
+            RECIPES_DATA = parsed;
+            saveAllLocal();
+            renderRecipesGrid();
+            alert('Техкарти успішно імпортовано!');
+        } catch (err) {
+            alert('Помилка читання JSON файлу!');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function populateVisualSelect() {
+    const sel = document.getElementById('visualItemSelect');
+    if (!sel) return;
+    
+    let html = '';
+    [...INGREDIENTS_CATALOG.pre, ...INGREDIENTS_CATALOG.post].forEach(group => {
+        html += `<optgroup label="${group.cat}">`;
+        group.items.forEach(item => {
+            html += `<option value="${item.id}">${item.name}</option>`;
+        });
+        html += `</optgroup>`;
+    });
+    sel.innerHTML = html;
+}
+
+function renderVisualVariations() {
+    const sel = document.getElementById('visualItemSelect');
+    const title = document.getElementById('visualTitle');
+    const container = document.getElementById('visualVariationsContainer');
+    if (!sel || !container) return;
+
+    const id = sel.value;
+    const name = getIngName(id);
+    title.textContent = `Варіації продукту: ${name}`;
+
+    let variationsCount = 1;
+    if (['mix', 'bel', 'mas', 'oli', 'mus'].includes(id)) {
+        variationsCount = 3;
+    } else if (['pep', 'chk', 'ched', 'tom', 'cuc', 'pin', 'sal', 'bac', 'bal', 'hun'].includes(id)) {
+        variationsCount = 2;
+    }
+
+    let html = '';
+    for (let i = 1; i <= variationsCount; i++) {
+        const photoKey = `${id}_v${i}`;
+        const customImg = customIngredientPhotos[photoKey];
+        const previewSVG = getSimulatorIngredientSVG(id, i - 1);
+
+        html += `
+            <div class="p-4 rounded-xl bg-[#0b0f19] border border-white/10 flex flex-col items-center gap-3">
+                <span class="text-xs font-bold text-slate-400">Вигляд #${i}</span>
+                <div class="w-32 h-32 rounded-xl bg-[#131a29] border border-white/15 flex items-center justify-center overflow-hidden relative shadow-inner p-3">
+                    ${customImg ? `
+                        <img src="${customImg}" class="w-full h-full object-cover rounded-lg" alt="Живе фото">
+                    ` : `
+                        <div class="w-full h-full flex items-center justify-center">
+                            <svg viewBox="-24 -24 48 48" class="w-24 h-24 drop-shadow-md overflow-visible">
+                                ${previewSVG}
+                            </svg>
+                        </div>
+                    `}
+                </div>
+                <div class="w-full">
+                    <label class="w-full py-2 px-3 rounded-lg bg-[#ff7a18]/20 hover:bg-[#ff7a18]/30 border border-[#ff7a18]/40 text-[#ff7a18] text-[11px] font-extrabold transition cursor-pointer text-center block">
+                        📂 Завантажити фото
+                        <input type="file" accept="image/*" class="hidden" onchange="uploadCustomPhoto('${photoKey}', event)">
+                    </label>
+                    ${customImg ? `
+                        <button type="button" onclick="removeCustomPhoto('${photoKey}')" class="w-full mt-1.5 py-1 text-[10px] text-red-400 hover:underline font-bold">Скинути фото</button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
+const rnd = s => { s = Math.sin(s * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s) };
+const SH = {};
+
+SH.pep = i => '<circle r="11" fill="#8f1f1b" stroke="#621511" stroke-width="1.2"/><circle r="9" fill="#a4302a" opacity=".55"/>' + [[0,0],[4.6,0],[2.3,4],[-2.3,4],[-4.6,0],[-2.3,-4],[2.3,-4],[7.4,2.4],[-7.4,2.4],[0,7.6],[0,-7.6],[7,-3.6],[-7,-3.6]].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="${(.9+((p[0]*7+p[1]*3)%3+3)%3*.18).toFixed(2)}" fill="#f4dccb"/>`).join('');
+SH.sal = i => '<circle r="13" fill="#b23a3a" stroke="#7c2323" stroke-width="1.5"/><circle cx="-5" cy="-4" r="1.8" fill="#f0c6bd"/><circle cx="5" cy="-5" r="1.6" fill="#f0c6bd"/><circle cx="4" cy="5" r="1.8" fill="#f0c6bd"/><circle cx="-4" cy="5" r="1.4" fill="#f0c6bd"/>';
+SH.shy = i => '<ellipse rx="14" ry="12.2" fill="#dba592" stroke="#c98876" stroke-width="1"/><ellipse rx="12.2" ry="10.4" fill="#efc3b1"/><ellipse cx="-3" cy="-3" rx="6.5" ry="4.2" fill="#f7d8ca" opacity=".8"/>';
+SH.bac = i => '<path d="M-16-3Q-8-8 0-4T16-3L15 4Q8 9 0 5T-15 4Z" fill="#b8473c" stroke="#8c2f27" stroke-width=".9"/><path d="M-15-.8Q-8-5 0-1.6T15-.6" fill="none" stroke="#f3e0d6" stroke-width="2"/><path d="M-15 2.2Q-8-1.6 0 2T15 2.4" fill="none" stroke="#f3e0d6" stroke-width="1.6"/><path d="M-15 .7Q-8-3 0 .2T15 .8M-14 3.4Q-8 .6 0 3.4T14 3.6" fill="none" stroke="#8c2f27" stroke-width=".6" opacity=".8"/>';
+SH.bal = i => '<ellipse rx="15.5" ry="8.8" fill="#8a4638" stroke="#5e2c22" stroke-width=".8"/><ellipse rx="14" ry="7.4" fill="#e7a29a"/><ellipse rx="9.6" ry="4.6" fill="#f3c6bf"/><path d="M-9 0Q-4-2 0 0T9 0" fill="none" stroke="#e29b93" stroke-width=".7"/><circle cx="-12" cy="-3" r=".7" fill="#5e2c22"/><circle cx="11" cy="3.2" r=".7" fill="#5e2c22"/><circle cx="2" cy="-7.4" r=".7" fill="#5e2c22"/><circle cx="-5" cy="7.2" r=".7" fill="#5e2c22"/>';
+SH.hun = i => '<rect x="-15" y="-4.5" width="30" height="9" rx="4.5" fill="#7b3b2a" stroke="#54261a"/><rect x="-12" y="-2.5" width="18" height="2" rx="1" fill="#a45e46"/>';
+SH.chk = i => '<rect x="-5.5" y="-5.5" width="11" height="11" rx="2.5" fill="#dcae80" stroke="#a8724a"/><rect x="-3" y="-3" width="4" height="4" rx="1" fill="#efcca2"/>';
+SH.moz = i => '<rect x="-3" y="-3" width="6" height="6" rx="1.2" fill="#f7f2e4" stroke="#d6cdb3" stroke-width=".6"/><path d="M3-2V2Q3 3 2 3H-2" fill="none" stroke="#e4dcc3" stroke-width="1"/><rect x="-2.1" y="-2.1" width="2.6" height="1.9" rx=".6" fill="#fffdf6" opacity=".9"/>';
+SH.ched = i => { const h=15, c=['#f0a62a','#f3ad34','#ec9f22'][i%3]; return `<rect x="${-h}" y="${-h}" width="${2*h}" height="${2*h}" rx="1.8" fill="${c}" stroke="#c97f12" stroke-width="1"/><rect x="${-h+2.2}" y="${-h+2.2}" width="${2*h-4.4}" height="${2*h-4.4}" rx="1.2" fill="none" stroke="#f9cd6c" stroke-width=".8" opacity=".7"/><path d="M${-h+4} ${-h+6}L${-h+12} ${-h+4}" stroke="#fbdc92" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>`; };
+SH.blu = i => '<path d="M-6-3L-2-7L5-5L7 1L2 6L-5 4Z" fill="#f1f0e6" stroke="#cfd3d6"/><circle cx="-2" cy="-1" r="1.3" fill="#5b7fa6"/><circle cx="2" cy="2" r="1.3" fill="#5b7fa6"/>';
+SH.mix = i => { const h=k=>rnd(i*7.7+k*2.9+1), L=12+h(0)*4, w=1.5+h(1)*1.1, cv=(h(2)-.5)*5.5, dy=(h(3)-.5)*3.2, col=['#f1c75a','#fffaf0','#f6e3a1','#f4d27a'][i%4]; return `<path d="M${-L} ${(-dy).toFixed(1)}Q${((h(4)-.5)*3).toFixed(1)} ${cv.toFixed(1)} ${L} ${dy.toFixed(1)}" fill="none" stroke="${col}" stroke-width="${(w*2).toFixed(1)}" stroke-linecap="round"/><path d="M${(-L*.7).toFixed(1)} ${(-dy*.7-.3).toFixed(1)}Q0 ${(cv*.8-.5).toFixed(1)} ${(L*.7).toFixed(1)} ${(dy*.7-.3).toFixed(1)}" fill="none" stroke="#fffdf4" stroke-width=".5" stroke-opacity=".55" stroke-linecap="round"/>`; };
+SH.tom = i => { const c=['#d9402d','#cf3526','#e24c36'][i%3]; return `<rect x="-10" y="-10" width="20" height="20" rx="3.8" fill="${c}" stroke="#9c2315" stroke-width="1.2"/><rect x="-6" y="-6" width="8" height="7" rx="1.5" fill="#ee7a63" opacity=".75"/>` + (i%2?'<ellipse cx="3" cy="3" rx="2" ry="1.2" fill="#f6e3a0"/>':'<ellipse cx="-2.5" cy="4" rx="1.8" ry="1.2" fill="#f6e3a0"/>'); };
+SH.bel = i => { const P=[['#d3281d','#9b1a12','#ee6a58'],['#4a9a2a','#2f6e18','#86cc62'],['#f2c21a','#c99a0b','#fbe77a']][i%3]; return `<rect x="-10" y="-10" width="20" height="20" rx="3.8" fill="${P[0]}" stroke="${P[1]}" stroke-width="1.2"/><rect x="-6.5" y="-6.5" width="9" height="6" rx="1.5" fill="${P[2]}" opacity=".7"/>`; };
+SH.oli = i => `<circle r="12" fill="none" stroke="${['#8c9a3c','#7f8f34','#98a645'][i%3]}" stroke-width="5"/><circle r="9" fill="none" stroke="#cdd884" stroke-width="1" stroke-opacity=".8"/>`;
+SH.mas = i => `<circle r="12" fill="none" stroke="${['#26252b','#2d2b33','#201f25'][i%3]}" stroke-width="5.2"/><circle r="9" fill="none" stroke="#6a6874" stroke-width="1" stroke-opacity=".8"/>`;
+SH.mus = i => `<path d="M-14 2Q-14-12 0-12Q14-12 14 2Q7 4 4.5 4V12Q4.5 15 0 15Q-4.5 15-4.5 12V4Q-7 4-14 2Z" fill="${['#e9dcc9','#e4d4be','#eee2d1'][i%3]}" stroke="#b8a082" stroke-width="1.2" stroke-linejoin="round"/><path d="M-9 -1Q-9-9 0-9Q9-9 9 -1Q4 1 0 1Q-4 1-9 -1Z" fill="#f7efe3"/>`;
+SH.chi = i => `<circle r="12" fill="none" stroke="#d22a1f" stroke-width="4.5" stroke-linejoin="round"/><ellipse cx="4" cy="-3" rx="1.8" ry="1.2" fill="#f3e7a0"/>`;
+SH.cor = i => `<ellipse rx="8" ry="10" fill="${i%2?'#f6c928':'#efb81c'}"/>`;
+SH.oni = i => '<path d="M-14 5Q0-16 14 5" fill="none" stroke="#b86bb0" stroke-width="4" stroke-linecap="round"/><path d="M-10 5Q0-10 10 5" fill="none" stroke="#e8b9df" stroke-width="1.5"/>';
+SH.pin = i => '<path d="M-12 8L-9-8Q0-14 9-8L12 8Q0 13-12 8Z" fill="#f7d94a" stroke="#e0b61f" stroke-width="1.2"/>';
+SH.cuc = i => '<circle r="15" fill="#7fb04a" stroke="#4f7d2a" stroke-width="1.2"/><circle r="10" fill="#c9e08e"/><circle cx="-3" cy="-2" r="1.8" fill="#f0f5cf"/><circle cx="3" cy="2" r="1.8" fill="#f0f5cf"/>';
+SH.aru = i => '<path d="M0 12Q-14 0-9-10Q0-15 9-10Q14 0 0 12Z" fill="#2f7a2e" stroke="#1f5a1d" stroke-width="1"/><path d="M0 10V-10" stroke="#8fcf7a" stroke-width="1.2"/>';
+SH.gon = i => '<ellipse rx="8" ry="7" fill="none" stroke="#4f9d34" stroke-width="3"/><ellipse rx="4.5" ry="4" fill="#cfeaa0" opacity=".85"/>';
+SH.ice = i => '<path d="M-14 0Q-8-10-2-2T14-2Q8 8 0 6T-14 0Z" fill="#cfe9a8" stroke="#a6cf74" stroke-width="1.2"/>';
+SH.spi = i => '<ellipse rx="7" ry="4" fill="#4a7a2c"/>';
+
+function getSimulatorIngredientSVG(id, index) {
+    if (SH[id]) {
+        return SH[id](index);
+    }
+    return `<circle r="14" fill="#ff7a18" opacity="0.3" stroke="#ff7a18" stroke-width="2"/><text y="5" font-size="16" text-anchor="middle" fill="#fff">🍕</text>`;
+}
+
+function uploadCustomPhoto(photoKey, event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        customIngredientPhotos[photoKey] = evt.target.result;
+        saveAllLocal();
+        renderVisualVariations();
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeCustomPhoto(photoKey) {
+    delete customIngredientPhotos[photoKey];
+    saveAllLocal();
+    renderVisualVariations();
+}
+</script>
+</body>
+</html>
