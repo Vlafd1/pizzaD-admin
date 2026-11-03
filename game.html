@@ -279,7 +279,7 @@ const TECH={'Маргарита':{
  35:{total:885,sauce:120,oni:60,chk:120,tom:50,moz:100,cuc:60,post:{bur:40},pat:{bur:'wave'}}}};   /* raw 910 -> baked 845 -> +40 = 885 */
 /* ---- sauce application style (TK: pat:{sauceId:'wave'|'spiral'}) ---- */
 const PAT_N={wave:'хвиляста лінія',spiral:'спіральна лінія'};
-function patCheck(){const tk=TECH[recipeName()]?.[SIZES[S.size].cm];if(!tk?.pat)return[];
+function patCheck(){const tk=tkMade();if(!tk?.pat)return[];
  return Object.entries(tk.pat).map(([id,need])=>{const ds=S.drizzles.filter(d=>d.id===id);return{id,need,n:TOPS.find(t=>t.id===id).n,got:[...new Set(ds.map(d=>PAT_N[d.pat]||d.pat))],ok:ds.length>0&&ds.every(d=>d.pat===need)}})}
 const patErrs=()=>patCheck().filter(r=>!r.ok).map(r=>r.got.length?`Неправильний стиль соусу «${r.n}»: нанесено ${r.got.join(', ')}, потрібна ${PAT_N[r.need]}`:`Соус «${r.n}» не нанесено (потрібна ${PAT_N[r.need]})`);
 /* ---- post-bake weight fine-tuning (herbs / greens: S.pw override, topping sauces: weight of the last drizzle) ---- */
@@ -312,16 +312,19 @@ const DEV_WARN=.1;   /* |deviation| <= 10% -> amber, above -> red, exact -> gree
 const curOrder=()=>{try{return ORDER}catch(e){return null}},
  recipeName=()=>curOrder()?.name||'Маргарита',
  tkFor=cm=>TECH[recipeName()]?.[cm],                       /* TK of a given size */
- tkMade=()=>tkFor(SIZES[S.size].cm),                       /* TK of the size being assembled */
+ ordCm=()=>curOrder()?.size??SIZES[S.size].cm,              /* ORDERED size (outside an order: the size taken) */
+ tkMade=()=>tkFor(ordCm()),                                 /* reference TK = the ORDER (recipe + size), never the dough the player happened to take */
  doughOf=cm=>Object.values(SIZES).find(z=>z.cm===cm).g,
  tkPost=tk=>tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),                                           /* post-bake items of a TK: {id:g} (legacy herbs -> Italian spices) */
  tkIngs=tk=>Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat'].includes(k)),
  tkBakedTarget=tk=>tk.total-Object.values(tkPost(tk)).reduce((a,b)=>a+b,0),                      /* Target Baked = Final TK - post-bake */
  tkRefRaw=(tk,cm)=>doughOf(cm)+tk.sauce+tkIngs(tk).reduce((a,k)=>a+tk[k],0);   /* raw weight of the standard assembly */
 const allK=()=>{const a=[];for(const r of Object.values(TECH))for(const cm in r)a.push(tkBakedTarget(r[cm])/tkRefRaw(r[cm],+cm));return a.reduce((x,y)=>x+y,0)/a.length},   /* only for a recipe that has no TK */
- bakeK=()=>{const tk=tkMade(),k=tk?tkBakedTarget(tk)/tkRefRaw(tk,SIZES[S.size].cm):allK();return Number.isFinite(k)&&k>0?k:1};   /* never NaN: a broken card degrades to "no bake loss" instead of poisoning every weight */
-const sauceG=id=>{const tk=tkMade();if(tk&&(tk.sauceId||'tomato')===id&&Number.isFinite(+tk.sauce))return+tk.sauce;   /* the card's own base sauce: exactly the TK grams (tomato / cream / bbq) */
- const w=Math.round(SAUCES[id].g*(tk&&Number.isFinite(+tk.sauce)?tk.sauce/SAUCES.tomato.g:1));return Number.isFinite(w)?w:SAUCES[id].g},   /* auto-sauce follows the TK: 60 / 60 / 120 g */
+ bakeK=()=>{const tk=tkMade(),k=tk?tkBakedTarget(tk)/tkRefRaw(tk,ordCm()):allK();return Number.isFinite(k)&&k>0?k:.92};   /* k comes from the ORDERED tech card but is applied to the weight that was REALLY assembled; no card at all -> 8% shrink */
+const SIZE_SAUCE_K={25:1,30:1,35:2},   /* auto-sauce follows the dough really taken: 60 / 60 / 120 g */
+ sauceG=id=>{const tk=tkMade(),mk=SIZE_SAUCE_K[SIZES[S.size].cm]??1,ok=SIZE_SAUCE_K[ordCm()]??1;
+  if(tk&&(tk.sauceId||'tomato')===id&&Number.isFinite(+tk.sauce))return Math.round(+tk.sauce*mk/ok);   /* the recipe's own sauce: TK grams, scaled by the size really taken */
+  const w=Math.round(SAUCES[id].g*mk);return Number.isFinite(w)?w:SAUCES[id].g},   /* auto-sauce follows the TK: 60 / 60 / 120 g */
  postG=p=>{const tk=tkMade();return S.pw[p.id]??(tk&&tkPost(tk)[p.id])??p.g};                                                          /* herbs follow the TK: 1 / 1 / 2 g */
 const raw=()=>SIZES[S.size].g+(S.sauce?sauceG(S.sauce):0)+ING.reduce((a,i)=>a+(S.qty[i.id]||0),0),
  baked=()=>Math.round(raw()*bakeK()),
@@ -956,13 +959,13 @@ async function finish(){
  report();
 }
 function deviations(){
- const name=recipeName(),cm=SIZES[S.size].cm,tk=TECH[name]?.[cm];if(!tk)return null;   /* TK of the size that was actually assembled (25 -> TK 25, 30 -> TK 30, 35 -> TK 35); a size that differs from the order is reported separately by sizeErrText() */
+ const name=recipeName(),cm=ordCm(),tk=TECH[name]?.[cm];if(!tk)return null;   /* reference = the ORDER (recipe + size); a wrong dough size is a separate error in the checklist AND a visible deviation in this table */
  const sid=tk.sauceId||'tomato',ks=tkIngs(tk),pk=tkPost(tk),pks=Object.keys(pk),nm=id=>(ING.find(i=>i.id===id)||POST.find(p=>p.id===id)||TOPS.find(t=>t.id===id)).n,
   actPost=id=>{const p=POST.find(x=>x.id===id);return p?(S.post[id]?postG(p):0):S.drizzles.filter(d=>d.id===id).reduce((a,d)=>a+d.g,0)},   /* post-bake herbs/greens or topping sauce */
-  a={sauce:S.sauce===sid?sauceG(sid):0,base:baked(),total:total()};
+  a={dough:SIZES[S.size].g,sauce:S.sauce===sid?sauceG(sid):0,base:baked(),total:total()};
  ks.forEach(k=>{a[k]=S.qty[k]||0});pks.forEach(k=>{a[k]=actPost(k)});
- const std=k=>k==='base'?tkBakedTarget(tk):k in pk?pk[k]:tk[k],
-  rows=[[SAUCES[sid].n,'sauce'],...ks.map(k=>[nm(k),k]),['Вага після випікання (без додавань після печі)','base'],...pks.map(k=>[`${nm(k)} (після випікання)`,k]),['Загальна вага піци','total']]
+ const std=k=>k==='dough'?doughOf(cm):k==='base'?tkBakedTarget(tk):k in pk?pk[k]:tk[k],
+  rows=[['Тісто (основа)','dough'],[SAUCES[sid].n,'sauce'],...ks.map(k=>[nm(k),k]),['Вага після випікання (без додавань після печі)','base'],...pks.map(k=>[`${nm(k)} (після випікання)`,k]),['Загальна вага піци','total']]
    .map(([n,k])=>{const s=std(k),v=a[k],d=v-s;return{n,k,s,a:v,d,p:s?d/s*100:(v?100:0)}});
  const extra=[...ING.filter(i=>!ks.includes(i.id)&&S.qty[i.id]).map(i=>`${i.n} ${S.qty[i.id]} г`),...POST.filter(p=>!pks.includes(p.id)&&S.post[p.id]).map(p=>`${p.n} ${postG(p)} г`),...S.drizzles.filter(d=>!pks.includes(d.id)).map(d=>`${TOPS.find(t=>t.id===d.id).n} ${d.g} г`)];
  if(S.sauce&&S.sauce!==sid)extra.push(`${SAUCES[S.sauce].n} ${sauceG(S.sauce)} г (замість: ${SAUCES[sid].n})`);
@@ -971,7 +974,7 @@ function deviations(){
 function devHTML(){try{return devHTMLraw()}catch(e){console.error('devHTML',e);return''}}   /* a report-block error can never break the result screen */
 function devHTMLraw(){
  const D=deviations();
- if(!D){const nm=recipeName();return TECH[nm]?`<div class="pt-2 border-t border-white/10 text-xs text-amber-300">Немає техкарти «${nm}» для ${SIZES[S.size].cm} см — відхилення не розраховано</div>`:''}
+ if(!D){const nm=recipeName();return TECH[nm]?`<div class="pt-2 border-t border-white/10 text-xs text-amber-300">Немає техкарти «${nm}» для ${ordCm()} см (розмір зі замовлення) — відхилення не розраховано</div>`:''}
  const col=r=>!r.d?'text-emerald-300':Math.abs(r.p)<=DEV_WARN*100?'text-amber-300':'text-red-300',fm=(v,u)=>(v>0?'+':v<0?'−':'')+Math.abs(v)+u;
  return `<div class="pt-2 border-t border-white/10 font-bold">Відхилення від ТК: ${D.name} ${D.cm} см</div>
   <div class="text-xs text-slate-300">Сира: ${raw()} г → випічка −${raw()-baked()} г: ${baked()} г → + після випікання ${post()} г = ${total()} г</div>
