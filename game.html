@@ -188,10 +188,25 @@ const RECIPES_READY=Promise.race([
  fetch('recipes.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{applyRecipes(d);return true}),
  new Promise(r=>setTimeout(()=>r(false),2500))
 ]).catch(()=>false);   /* always resolves: game start / first order wait for it */
+function adminToTech(tk){   /* native dashboard format (ings / post arrays, pat string) -> tech card; null = incomplete */
+ if(!tk||!Array.isArray(tk.ings))return tk;
+ const n=v=>(v===''||v===null||typeof v==='boolean')?NaN:Number(v),o={total:n(tk.total),sauce:n(tk.sauce)},ids=[],post={};
+ if(tk.sauceId)o.sauceId=tk.sauceId;
+ for(const i of tk.ings){const g=n(i&&i.g);if(!i||!i.id||!(g>0))return null;o[i.id]=(o[i.id]||0)+g;ids.push(i.id)}
+ if(!ids.length)return null;
+ if(new Set(ids).size<ids.length)o.layers=ids;   /* repeated ingredient = stacking order (mozzarella under and over pepperoni) */
+ for(const i of tk.post||[]){const g=n(i&&i.g);if(!i||!i.id||!(g>0))return null;post[i.id]=(post[i.id]||0)+g}
+ if(Object.keys(post).length)o.post=post;
+ if(typeof tk.pat==='string'&&tk.pat!=='none'){const t=Object.keys(post).filter(id=>['bur','ter','sch','cez'].includes(id));if(t.length){o.pat={};t.forEach(id=>{o.pat[id]=tk.pat})}}
+ return o;
+}
 function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PPG} or a bare TECH object */
  if(!d||typeof d!=='object')return;
  const known=['TECH','SAUCES','SIZES','ING','POST','TOPS','PPG'],T=d.TECH||(known.some(k=>k in d)?null:d);
- if(T)for(const[n,z]of Object.entries(T))if(z&&typeof z==='object')TECH[n]=z;   /* dashboard recipes replace / extend the built-in tech cards */
+ const okTK=tk=>{if(!tk||typeof tk!=='object')return false;const num=v=>typeof v==='number'&&isFinite(v)&&v>=0,post=tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),
+  ing=Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat'].includes(k));
+  return num(tk.total)&&tk.total>0&&num(tk.sauce)&&ing.length>0&&(!tk.sauceId||!!SAUCES[tk.sauceId])&&ing.every(k=>num(tk[k])&&ING.some(i=>i.id===k))&&Object.values(post).every(num)&&Object.keys(post).every(k=>POST.some(p=>p.id===k)||TOPS.some(t=>t.id===k))&&tk.total>Object.values(post).reduce((a,b)=>a+b,0)};   /* no NaN / negative / incomplete tech cards reach the weight math */
+ if(T)for(const[n,z]of Object.entries(T)){if(!z||typeof z!=='object')continue;const ok={};for(const[cm,tk0]of Object.entries(z)){const tk=adminToTech(tk0);if(okTK(tk))ok[cm]=tk}if(Object.keys(ok).length)TECH[n]=ok}   /* dashboard recipes replace / extend the built-in tech cards (valid sizes only) */
  const mix=(dst,src)=>{for(const[k,v]of Object.entries(src||{}))dst[k]=v&&typeof v==='object'?Object.assign(dst[k]||{},v):v};
  mix(SAUCES,d.SAUCES);mix(SIZES,d.SIZES);mix(PPG,d.PPG);
  const byId=(arr,src)=>(src||[]).forEach(x=>{const o=arr.find(i=>i.id===x.id);if(o)Object.assign(o,x);else if(SH[x.id])arr.push(x)});   /* a new ingredient needs an SVG shape in SH */
