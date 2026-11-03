@@ -314,13 +314,14 @@ const curOrder=()=>{try{return ORDER}catch(e){return null}},
  tkFor=cm=>TECH[recipeName()]?.[cm],                       /* TK of a given size */
  tkMade=()=>tkFor(SIZES[S.size].cm),                       /* TK of the size being assembled */
  doughOf=cm=>Object.values(SIZES).find(z=>z.cm===cm).g,
- tkPost=tk=>tk.post||{spi:tk.herbs},                                           /* post-bake items of a TK: {id:g} (legacy herbs -> Italian spices) */
+ tkPost=tk=>tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),                                           /* post-bake items of a TK: {id:g} (legacy herbs -> Italian spices) */
  tkIngs=tk=>Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat'].includes(k)),
  tkBakedTarget=tk=>tk.total-Object.values(tkPost(tk)).reduce((a,b)=>a+b,0),                      /* Target Baked = Final TK - post-bake */
  tkRefRaw=(tk,cm)=>doughOf(cm)+tk.sauce+tkIngs(tk).reduce((a,k)=>a+tk[k],0);   /* raw weight of the standard assembly */
 const allK=()=>{const a=[];for(const r of Object.values(TECH))for(const cm in r)a.push(tkBakedTarget(r[cm])/tkRefRaw(r[cm],+cm));return a.reduce((x,y)=>x+y,0)/a.length},   /* only for a recipe that has no TK */
- bakeK=()=>{const tk=tkMade();return tk?tkBakedTarget(tk)/tkRefRaw(tk,SIZES[S.size].cm):allK()};
-const sauceG=id=>{const tk=tkMade();return Math.round(SAUCES[id].g*(tk?tk.sauce/SAUCES.tomato.g:1))},   /* auto-sauce follows the TK: 60 / 60 / 120 g */
+ bakeK=()=>{const tk=tkMade(),k=tk?tkBakedTarget(tk)/tkRefRaw(tk,SIZES[S.size].cm):allK();return Number.isFinite(k)&&k>0?k:1};   /* never NaN: a broken card degrades to "no bake loss" instead of poisoning every weight */
+const sauceG=id=>{const tk=tkMade();if(tk&&(tk.sauceId||'tomato')===id&&Number.isFinite(+tk.sauce))return+tk.sauce;   /* the card's own base sauce: exactly the TK grams (tomato / cream / bbq) */
+ const w=Math.round(SAUCES[id].g*(tk&&Number.isFinite(+tk.sauce)?tk.sauce/SAUCES.tomato.g:1));return Number.isFinite(w)?w:SAUCES[id].g},   /* auto-sauce follows the TK: 60 / 60 / 120 g */
  postG=p=>{const tk=tkMade();return S.pw[p.id]??(tk&&tkPost(tk)[p.id])??p.g};                                                          /* herbs follow the TK: 1 / 1 / 2 g */
 const raw=()=>SIZES[S.size].g+(S.sauce?sauceG(S.sauce):0)+ING.reduce((a,i)=>a+(S.qty[i.id]||0),0),
  baked=()=>Math.round(raw()*bakeK()),
@@ -967,8 +968,10 @@ function deviations(){
  if(S.sauce&&S.sauce!==sid)extra.push(`${SAUCES[S.sauce].n} ${sauceG(S.sauce)} г (замість: ${SAUCES[sid].n})`);
  return{name,cm,rows,extra,layers:tk.layers?{need:tk.layers,seq:S.seq||[],ok:seqOk(S.seq||[],tk.layers)}:null,pats:patCheck()};
 }
-function devHTML(){
- const D=deviations();if(!D)return'';
+function devHTML(){try{return devHTMLraw()}catch(e){console.error('devHTML',e);return''}}   /* a report-block error can never break the result screen */
+function devHTMLraw(){
+ const D=deviations();
+ if(!D){const nm=recipeName();return TECH[nm]?`<div class="pt-2 border-t border-white/10 text-xs text-amber-300">Немає техкарти «${nm}» для ${SIZES[S.size].cm} см — відхилення не розраховано</div>`:''}
  const col=r=>!r.d?'text-emerald-300':Math.abs(r.p)<=DEV_WARN*100?'text-amber-300':'text-red-300',fm=(v,u)=>(v>0?'+':v<0?'−':'')+Math.abs(v)+u;
  return `<div class="pt-2 border-t border-white/10 font-bold">Відхилення від ТК: ${D.name} ${D.cm} см</div>
   <div class="text-xs text-slate-300">Сира: ${raw()} г → випічка −${raw()-baked()} г: ${baked()} г → + після випікання ${post()} г = ${total()} г</div>
