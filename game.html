@@ -120,6 +120,20 @@
     return v > 0 ? Number(v) : PC.startDefault(cm, id);
   };
   PC.doughDefault = cm => (PC.sizes[PC.sizeKey[cm]] || {}).g;
+  /* default +/- step (grams per button press); null = the item has no +/- buttons (base sauces follow the TK) */
+  PC.stepDefault = function (cm, id) {
+    cm = Number(cm);
+    if (PC.isBaseSauce(id)) return null;
+    const it = byId[id], cat = it ? it.cat : null;
+    if (cat === 'gr') return (id === 'spi' || id === 'gon') ? 1 : 5;
+    if (cat === 'sauce') return 5;
+    if (id === 'ched') return 12.5;
+    return (cat === 'meat' || (cm === 103 && id === 'chi')) ? 5 : 10;
+  };
+  PC.stepW = function (overrides, cm, id) {
+    const v = overrides && overrides[cm] && overrides[cm][id];
+    return v > 0 ? Number(v) : PC.stepDefault(cm, id);
+  };
   /* drop overrides of ingredients that were removed from the registry and junk values; new ingredients simply have no override -> default */
   PC.sanitizeStart = function (w) {
     const out = {};
@@ -158,7 +172,7 @@
     const st = { schema: PC.schema, fromSchema: Number(o.schema) || 1, rev: Number(o.rev) || 0, registryVersion: o.registryVersion || null,
       std: o.std && typeof o.std === 'object' ? o.std : null, ns: o.ns && typeof o.ns === 'object' ? o.ns : null,
       created: o.created && typeof o.created === 'object' ? o.created : {},
-      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough) } };
+      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough), step: PC.sanitizeStart(o.start && o.start.step) } };
     return st;
   };
   PC.migrateLegacy = function () {
@@ -169,7 +183,7 @@
   };
   PC.saveState = function (state) {
     const o = { schema: PC.schema, rev: Date.now(), registryVersion: PC.version, std: state.std, ns: state.ns, created: state.created || {},
-      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough) } };
+      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough), step: PC.sanitizeStart(state.start && state.start.step) } };
     const ok = store.set(KEY, JSON.stringify(o));
     PC._lastRev = o.rev;
     try { if (PC._bc) PC._bc.postMessage({ type: 'config', rev: o.rev }); } catch (e) {}
@@ -276,15 +290,51 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
  background:rgba(15,20,32,.55);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);transition:color .18s,border-color .18s,background .18s}
 #exitBtn:hover{color:#fff;border-color:rgba(255,138,42,.7);background:rgba(255,138,42,.18)}
 /* ---- start screen ---- */
+.sr-row{display:flex;flex-direction:row;gap:12px;width:100%;max-width:340px;margin-top:20px}.sr-row button{flex:1;min-height:56px;padding:10px 12px;border-radius:16px;font:inherit;font-size:.9rem;font-weight:800;line-height:1.2;cursor:pointer;transition:transform .15s,background .15s,border-color .15s}.sr-row button:active{transform:scale(.97)}.sr-pri{color:#fff;border:1px solid #fb923c;background:linear-gradient(160deg,#fb7c1f,#f97316);box-shadow:0 8px 22px rgba(249,115,22,.35)}.sr-pri:hover{background:#ff8a2a}.sr-sec{color:#fff;border:1.5px solid #3b82f6;background:#1e293b}.sr-sec:hover{background:#273449;border-color:#60a5fa}
+#doneM{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(5,8,14,.78);backdrop-filter:blur(8px)}
+#doneM.on{display:flex;animation:dmIn .3s ease both}
+@keyframes dmIn{from{opacity:0}to{opacity:1}}
+#doneM .dm-card{width:min(100%,360px);display:flex;flex-direction:column;gap:10px;text-align:center;padding:26px 22px 22px;border-radius:24px;background:linear-gradient(170deg,#1a2338,#101626);border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+#doneM .dm-ico{font-size:2.6rem;filter:drop-shadow(0 6px 18px rgba(255,138,42,.45))}
+#doneM h3{margin:0;font-size:1.3rem;font-weight:800;color:#fff}
+#doneM p{margin:0 0 8px;font-size:.84rem;line-height:1.5;color:#a8b3c7}
+#doneM button{padding:14px 16px;border-radius:16px;font:inherit;font-size:.95rem;font-weight:800;cursor:pointer;border:1px solid transparent;transition:transform .15s,background .15s}
+#doneM button:active{transform:scale(.98)}
+#doneM .dm-pri{color:#fff;border-color:rgba(255,138,42,.75);background:linear-gradient(160deg,#ff9a3c,#e8731a);box-shadow:0 10px 26px rgba(232,115,26,.38)}
+#doneM .dm-sec{color:#fff;border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.08)}
+#doneM .dm-sec:hover{border-color:rgba(255,138,42,.7);background:rgba(255,138,42,.16)}
+#doneM .dm-gh{color:#94a3b8;background:transparent}
+#doneM .dm-gh:hover{color:#fff;background:rgba(255,255,255,.06)}
+#doneM .dm-red{color:#fff;border-color:rgba(248,113,113,.7);background:linear-gradient(160deg,#ef4444,#b91c1c);box-shadow:0 10px 26px rgba(220,38,38,.34)}#doneM .dm-red:hover{background:linear-gradient(160deg,#f87171,#dc2626);border-color:#fca5a5}
 #startScr{position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;box-sizing:border-box;
  background:radial-gradient(ellipse 70% 45% at 50% 28%,rgba(255,138,42,.28),transparent 70%),radial-gradient(ellipse 80% 50% at 50% 100%,rgba(70,110,200,.22),transparent 70%),linear-gradient(180deg,#0b101b,#080b13);
  opacity:1;transition:opacity .5s ease}
 #startScr.out{opacity:0;pointer-events:none}
-#startScr .ss-pick{display:none;flex-direction:column;gap:12px;width:min(100%,320px)}
-#startScr .ss-pick.on{display:flex}
+#startScr .ss-pick{display:none;flex-direction:column;gap:10px;width:min(100%,720px)}
+#startScr .ss-pick.on{display:flex;flex:1;min-height:0}
+#startScr.picking{justify-content:flex-start;gap:12px;padding:14px 14px 12px}
+#startScr.picking .ss-logo,#startScr.picking h2,#startScr.picking #ssMenu{display:none}
 #startScr .ss-pick h3{margin:0;font-size:1rem;font-weight:800;color:#fff;text-align:center;letter-spacing:.03em}
-#pickList{max-height:46vh;overflow:auto;padding:2px}
-#pickList small{display:block;margin-top:2px;font-size:.72rem;font-weight:600;opacity:.75}
+#pkTabs{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px;flex:none}
+#pkTabs::-webkit-scrollbar{display:none}
+#startScr .pk-tab{flex:none;padding:7px 13px;border-radius:999px;font-size:.76rem;font-weight:800;color:#b6c0d2;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);white-space:nowrap}
+#startScr .pk-tab:hover{transform:none;color:#fff;background:rgba(255,138,42,.16);border-color:rgba(255,138,42,.6);box-shadow:none}
+#startScr .pk-tab.on{color:#fff;background:linear-gradient(160deg,#ff9a3c,#e8731a);border-color:rgba(255,138,42,.9);box-shadow:0 6px 16px rgba(232,115,26,.35)}
+#pkSearch{flex:none;width:100%;box-sizing:border-box;padding:10px 14px;border-radius:14px;font:inherit;font-size:.85rem;font-weight:600;color:#fff;background:rgba(8,12,20,.75);border:1px solid rgba(255,255,255,.16);outline:0}
+#pkSearch:focus{border-color:rgba(255,138,42,.8)}
+#pkSearch::placeholder{color:#7d889c}
+#pickList{flex:1;min-height:0;overflow:auto;padding:2px;display:grid;grid-template-columns:1fr;gap:10px;align-content:start;width:100%;flex-direction:initial}
+@media(min-width:640px){#pickList{grid-template-columns:1fr 1fr}}
+#startScr .pk-card{box-sizing:border-box;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;min-height:0;border-radius:14px;font-size:.9rem;font-weight:800;text-align:left;color:#fff;background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.16);box-shadow:none;cursor:pointer}
+#startScr button.pk-card:hover{transform:none;border-color:rgba(255,138,42,.7);background:linear-gradient(160deg,rgba(255,138,42,.26),rgba(255,138,42,.08));box-shadow:none}
+#startScr .pk-card.std{cursor:default;flex-wrap:wrap}
+#startScr .pk-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#startScr .pk-sz{display:flex;gap:5px;flex:none}
+#startScr .pk-sz button{padding:5px 9px;border-radius:9px;font-size:.72rem;font-weight:800;color:#ffd9b3;background:rgba(255,138,42,.14);border:1px solid rgba(255,138,42,.5)}
+#startScr .pk-sz button:hover{transform:none;color:#fff;background:linear-gradient(160deg,#ff9a3c,#e8731a);box-shadow:none}
+#startScr .pk-b{flex:none;padding:3px 9px;border-radius:999px;font-size:.66rem;font-weight:800;letter-spacing:.02em;color:var(--bc,#cbd5e1);background:var(--bb,rgba(255,255,255,.08));border:1px solid var(--bd,rgba(255,255,255,.2))}
+#pkEmpty{grid-column:1/-1;text-align:center;color:#7d889c;font-size:.85rem;padding:20px 0}
+#startScr #pickBack{flex:none;padding:12px 16px;font-size:.95rem;border-radius:14px}
 #startScr .ss-logo{font-size:3.6rem;filter:drop-shadow(0 8px 24px rgba(255,138,42,.45));animation:ssFloat 3.2s ease-in-out infinite}
 #startScr h2{margin:0 0 6px;font-size:1.35rem;font-weight:800;letter-spacing:.04em;color:#fff;text-align:center}
 #startScr .ss-btns{display:flex;flex-direction:column;gap:12px;width:min(100%,320px)}
@@ -366,6 +416,16 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
     <button class="pat" data-pat="wave"><svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="56" fill="#caa66e"/><path class="pv" d="M24 30H84A9 9 0 0 1 84 48H36A9 9 0 0 0 36 66H84A9 9 0 0 1 84 84H24" fill="none" stroke-width="5" stroke-linecap="round"/></svg><span>Хвиляста лінія</span></button>
     <button class="pat" data-pat="spiral"><svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="56" fill="#caa66e"/><path class="pv" d="M60 60 m0 0 q4-6 10-2 t2 14 t-16 8 t-20-14 t10-26 t34 4 t12 36 t-30 22" fill="none" stroke-width="5" stroke-linecap="round"/></svg><span>Спіральна лінія</span></button></div>
     <button class="tab" id="mcancel">Скасувати</button></div>
+  <div id="doneM" role="dialog" aria-modal="true" aria-labelledby="doneT">
+    <div class="dm-card">
+      <div class="dm-ico">🏆</div>
+      <h3 id="doneT">Усі піци пройдено!</h3>
+      <p>Ви успішно приготували всі доступні рецепти у цьому форматі. Ви можете пройти тренування ще раз, обрати конкретну піцу для відпрацювання або завершити сеанс.</p>
+      <button type="button" class="dm-pri" onclick="doneRepeat()">Пройти повторно</button>
+      <button type="button" class="dm-sec" onclick="donePick()">Перейти до вибору піци</button>
+      <button type="button" class="dm-red" onclick="doneFinish()">Завершити</button>
+    </div>
+  </div>
   <div id="startScr">
     <div class="ss-logo">🍕</div>
     <h2>Почати тренування:</h2>
@@ -375,7 +435,7 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
       <button type="button" class="ss-main" data-mode="all">Всі формати піц</button>
       <button type="button" id="ssPick">🎯 Обрати піцу для тренування</button>
     </div>
-    <div class="ss-pick" id="pickPanel"><h3>Оберіть піцу:</h3><div class="ss-btns" id="pickList"></div><button type="button" id="pickBack">← Назад</button></div>
+    <div class="ss-pick" id="pickPanel"><h3>Оберіть піцу:</h3><div id="pkTabs"></div><input id="pkSearch" type="search" placeholder="Пошук за назвою..." autocomplete="off"><div id="pickList"></div><button type="button" id="pickBack">← Назад</button></div>
   </div>
   <script>try{if(['pizza','focus','custom'].includes(sessionStorage.getItem('pzMode')))document.getElementById('startScr').style.display='none'}catch(e){}</script>
   <div id="ordOv"><div id="ordBd"></div><div id="ordCard"><small>Нове замовлення</small><b></b></div></div>
@@ -414,9 +474,10 @@ function applyStore(st,live){
  if(st.std)Object.keys(TECH).forEach(k=>delete TECH[k]);
  if(st.ns)Object.keys(TECH_NS).forEach(k=>delete TECH_NS[k]);
  Object.keys(START_W).forEach(k=>delete START_W[k]);
+ Object.keys(STEP_W).forEach(k=>delete STEP_W[k]);
  Object.keys(PC.sizes).forEach(k=>{SIZES[k].g=PC.sizes[k].g});
  const sz={};Object.entries(st.start.dough||{}).forEach(([cm,g])=>{const k=PC.sizeKey[cm];if(k)sz[k]={g}});
- applyRecipes({TECH:st.std||undefined,TECH_NS:st.ns?PC.nsToByName(st.ns):undefined,START_W:st.start.w,SIZES:sz});
+ applyRecipes({TECH:st.std||undefined,TECH_NS:st.ns?PC.nsToByName(st.ns):undefined,START_W:st.start.w,STEP_W:st.start.step,SIZES:sz});
  if(!Object.keys(TECH).length)Object.assign(TECH,bakT);   /* an empty / broken base never leaves the game without recipes */
  if(!Object.keys(TECH_NS).length)Object.assign(TECH_NS,bakN);
  ORDER_CATALOG[0].names=Object.keys(TECH);
@@ -430,7 +491,7 @@ function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PP
   return num(tk.total)&&tk.total>0&&num(tk.sauce)&&ing.length>0&&(!tk.sauceId||!!SAUCES[tk.sauceId])&&ing.every(k=>num(tk[k])&&ING.some(i=>i.id===k))&&Object.values(post).every(num)&&Object.keys(post).every(k=>POST.some(p=>p.id===k)||TOPS.some(t=>t.id===k))&&tk.total>Object.values(post).reduce((a,b)=>a+b,0)};   /* no NaN / negative / incomplete tech cards reach the weight math */
  if(T)for(const[n,z]of Object.entries(T)){if(!z||typeof z!=='object')continue;const ok={};for(const[cm,tk0]of Object.entries(z)){const tk=adminToTech(tk0);if(okTK(tk))ok[cm]=tk}if(Object.keys(ok).length)TECH[n]=ok}   /* dashboard recipes replace / extend the built-in tech cards (valid sizes only) */
  if(d.TECH_NS&&typeof d.TECH_NS==='object')for(const[n,z]of Object.entries(d.TECH_NS)){if(!z||typeof z!=='object')continue;const ok={};for(const[cm,tk0]of Object.entries(z)){const tk=adminToTech(tk0);if(okTK(tk)&&(+cm===101||+cm===102||+cm===103))ok[cm]=tk}if(Object.keys(ok).length)TECH_NS[n]=ok}   /* non-standard recipes stay in their own table */
- if(d.START_W&&typeof d.START_W==='object')for(const[cm,o]of Object.entries(d.START_W)){if(!o||typeof o!=='object')continue;const t=START_W[cm]=START_W[cm]||{};for(const[id,g]of Object.entries(o))if(typeof g==='number'&&isFinite(g)&&g>0)t[id]=g}   /* dashboard start weights */
+ for(const[key,dst]of[['START_W',START_W],['STEP_W',STEP_W]])if(d[key]&&typeof d[key]==='object')for(const[cm,o]of Object.entries(d[key])){if(!o||typeof o!=='object')continue;const t=dst[cm]=dst[cm]||{};for(const[id,g]of Object.entries(o))if(typeof g==='number'&&isFinite(g)&&g>0)t[id]=g}   /* dashboard start weights */
  const mix=(dst,src)=>{for(const[k,v]of Object.entries(src||{}))dst[k]=v&&typeof v==='object'?Object.assign(dst[k]||{},v):v};
  mix(SAUCES,d.SAUCES);mix(SIZES,d.SIZES);mix(PPG,d.PPG);
  const byId=(arr,src)=>(src||[]).forEach(x=>{const o=arr.find(i=>i.id===x.id);if(o)Object.assign(o,x);else if(SH[x.id])arr.push(x)});   /* a new ingredient needs an SVG shape in SH */
@@ -490,7 +551,7 @@ const DEF_G=PC.startRules.DEF_G,   /* first click = this many grams */
  VK=id=>(VIS_G[id]&&DEF_G[id])?VIS_G[id]/DEF_G[id]:1,                                         /* hun 3.0x, shy 1.33x, bac 1.67x, bal 1.8x, chk 2.0x, chi 2.0x, oni 1.67x, pin 1.67x */
  FINE=new Set(PC.startRules.FINE),                                   /* micro-dosed: never shifted by crust size */
  SIZE_D=PC.startRules.SIZE_D,                                          /* 25 cm crust (200 g): -10 g, 30 cm: as configured, 35 cm crust (400 g): +20 g */
- STEP_G=it=>it.id==='ched'?12.5:it.cat==='meat'||(S.panType==='sandwich'&&it.id==='chi')?5:10,                                     /* +/- step before the oven: meats 5 g */
+ STEP_G=it=>stepW(it.id,PC.stepDefault(SIZES[S.size].cm,it.id)),                                     /* +/- step before the oven: meats 5 g */
  def=it=>startW(it.id,PC.startDefault(SIZES[S.size].cm,it.id));   /* start weight of the first click: dashboard override, else the registry rule (by crust size / format) */
 const hasMeat=()=>ING.some(i=>i.cat==='meat'&&S.qty[i.id]>0),hasCheese=()=>ING.some(i=>i.cat==='che'&&S.qty[i.id]>0);
 /* baking drives off 7% of the weight (moisture loss, "uzharka"); toppings added after baking are weighed on top of that */
@@ -527,10 +588,10 @@ function selPost(id,t){   /* same feel as the pre-oven list: tap = add + select,
 const PPG={spi:240};   /* particles per gram of post-bake item (default: pp/g). Italian herbs: 240 per gram (2x density, same flake size), identical for every base format */
 function adjPost(id,dir){
  const p=POST.find(x=>x.id===id);
- if(p){if(!S.post[id])return;const st=PW_STEP[id]||5,n=postG(p)+dir*st;
+ if(p){if(!S.post[id])return;const st=stepW(id,PW_STEP[id]||5),n=postG(p)+dir*st;
   if(n<=0){S.post[id]=false;delete S.pw[id];if(S.psel===id)S.psel=null;sync([id],null,'pop')}   /* 0 g = item fully removed from state and canvas */
   else{S.pw[id]=Math.min(100,n);sync([id],null,'pop')}}   /* particle count follows the weight, live */
- else{const L=S.drizzles.filter(d=>d.id===id).pop();if(!L)return;const n=L.g+dir*PW_TOP;
+ else{const L=S.drizzles.filter(d=>d.id===id).pop();if(!L)return;const n=L.g+dir*stepW(id,PW_TOP);
   if(n<=0){const k=S.drizzles.lastIndexOf(L);S.drizzles.splice(k,1);L.el.style.transition='opacity .25s';L.el.style.opacity=0;setTimeout(()=>L.el.remove(),260);if(!S.drizzles.some(d=>d.id===id)&&S.psel===id)S.psel=null}   /* last stroke gone -> sauce removed */
   else{L.g=Math.min(150,n);L.redraw&&L.redraw(Math.max(.15,Math.min(2.4,SVK(id)*L.g/L.g0)))}}   /* sauce line thickness follows the weight, live */
  refresh();panel();
@@ -544,6 +605,7 @@ const DEV_WARN=.1;   /* |deviation| <= 10% -> amber, above -> red, exact -> gree
                              (Margarita 25 cm: 340 g raw -> 314 g baked = 315 - 1)
    FINAL  = BAKED + post-bake herbs  (Margarita 25 cm: 314 + 1 = 315 g, 0 g deviation) */
 /* NON-STANDARD recipes: their own table, never mixed with TECH (round pizzas). Key = name -> format id (101 = К-Піца, 102 = Піца Капкейки). Values are placeholders until real tech cards arrive (dashboard JSON key TECH_NS). */
+const STEP_W={},stepW=(id,d,cm)=>{const o=STEP_W[cm??SIZES[S.size].cm],v=o&&o[id];return v>0?v:d};   /* per-format +/- step (g) from the dashboard */
 const START_W={},startW=(id,d,cm)=>{const o=START_W[cm??SIZES[S.size].cm],v=o&&o[id];return v>0?v:d};   /* per-format start weights from the dashboard tab «Зміна стартової ваги» (key = cm 25/30/35 or format id 101/102/103); missing -> built-in defaults */
 const TECH_NS={   /* 101 = К-Піца, 102 = Піца Капкейки, 103 = Піца-сендвіч. Each format has its OWN short menu (recipesByFormat below) - nothing is cloned from the round-pizza catalog */
  'Маргарита':{101:{total:303,sauce:60,moz:100,tom:40,post:{spi:1}},103:{total:361,sauce:60,moz:100,tom:40,post:{spi:1}}},
@@ -1750,7 +1812,7 @@ function report(){
  d.style.display='flex';
  d.innerHTML=`<div class="text-5xl">✔</div><div class="text-2xl font-extrabold mt-2" style="color:var(--ok)">Замовлення виконано!</div>
  <div class="mt-4 w-full max-w-[340px] text-left text-sm rounded-2xl bg-white/[.07] border border-white/10 p-4">${blocks}</div>
- <button class="ready mt-5" onclick="nextOrder()">Нове замовлення</button>`;
+ ${singleRecipe()?`<div class="sr-row"><button class="sr-pri" onclick="singleRepeat()">Повторити проходження</button><button class="sr-sec" onclick="singleBack()">Повернутись до вибору піци</button></div>`:`<button class="ready mt-5" onclick="nextOrder()">Нове замовлення</button>`}`;
  for(let i=0;i<30;i++){const s=document.createElement('div'),a=Math.random()*6.28,r=90+Math.random()*150;s.className='spark';s.style.cssText=`left:50%;top:30%;background:hsl(${Math.random()*360} 90% 60%);--x:${Math.cos(a)*r}px;--y:${Math.sin(a)*r}px;animation-delay:${Math.random()*.4}s`;d.appendChild(s)}
 }
 /* ---- order system ---- */
@@ -1763,13 +1825,27 @@ const nsFocus=()=>currentGameMode==='focus'&&typeof FOCUS==='string'&&FOCUS.star
  allTK=()=>{   /* ONE shared database: every standard TK (TECH) x every size + every non-standard TK (TECH_NS) x format - read live, so admin edits show up at once */
   const a=[];for(const n of Object.keys(TECH))for(const cm of pizzaSizes(n))a.push({name:n,size:cm,ns:0});
   for(const [n,z] of Object.entries(TECH_NS))for(const cm of Object.keys(z))if(Object.values(SIZES).some(v=>v.ns&&v.cm===+cm))a.push({name:n,size:+cm,ns:1});return a};
+/* ---- session queue: inside one training session (start screen -> «В меню») an order is never repeated until the whole pool of the mode is done ---- */
+const doneStore={
+ get(){try{const o=JSON.parse(sessionStorage.getItem('pzDone')||'null');return o&&o.mode===currentGameMode?new Set(o.keys):new Set()}catch(e){return new Set()}},
+ add(k){const s=this.get();s.add(k);try{sessionStorage.setItem('pzDone',JSON.stringify({mode:currentGameMode,keys:[...s]}))}catch(e){}},
+ clear(){try{sessionStorage.removeItem('pzDone')}catch(e){}}};
+const oKey=o=>(o.ns?1:0)+'|'+o.size+'|'+o.name,
+ stdPool=()=>Object.keys(TECH).flatMap(n=>pizzaSizes(n).map(cm=>({kind:(ORDER_CATALOG[0]||{}).kind||'Піца',name:n,size:cm}))),
+ nsPool=pt=>{const a=[];[['k_pizza',101],['cupcakes',102],['sandwich',103]].forEach(([k,f])=>{if(!pt||pt===k)recipesByFormat[k]().forEach(n=>a.push({kind:'Піца',name:n,size:f,ns:1}))});return a},
+ allPool=()=>allTK().map(e=>e.ns?{kind:'Піца',name:e.name,size:e.size,ns:1}:{kind:'Піца',name:e.name,size:e.size}),
+ modePool=()=>currentGameMode==='all'?allPool():currentGameMode==='custom'?nsPool(null):stdPool(),
+ queued=()=>currentGameMode==='pizza'||currentGameMode==='custom'||currentGameMode==='all',   /* targeted training («Обрати піцу») has no queue */
+ remaining=()=>{const d=doneStore.get();return modePool().filter(o=>!d.has(oKey(o)))},
+ exhausted=()=>queued()&&modePool().length>0&&remaining().length===0,
+ pickQ=pool=>{const d=doneStore.get(),rem=pool.filter(o=>!d.has(oKey(o)));return pickOne(rem.length?rem:pool)};   /* pool empty of fresh recipes (cannot normally happen: the modal shows first) -> plain random */
 function genOrder(){
  if(currentGameMode==='all'){   /* «Всі формати піц»: no category filter, random across the whole base (never the same card twice in a row) */
-  const a=allTK();if(a.length){let last=null;try{last=sessionStorage.getItem('pzLastAll')}catch(e){}
-   const f=a.filter(e=>e.ns+'|'+e.size+'|'+e.name!==last),e=pickOne(f.length?f:a);try{sessionStorage.setItem('pzLastAll',e.ns+'|'+e.size+'|'+e.name)}catch(x){}
-   return e.ns?{kind:'Піца',name:e.name,size:e.size,ns:1}:{kind:'Піца',name:e.name,size:e.size}}}
+  const a=allPool();if(a.length)return pickQ(a)}
+ if(currentGameMode==='focus'&&typeof FOCUS==='string'&&FOCUS.startsWith('std|')){const [,cm,...nm]=FOCUS.split('|');return{kind:(ORDER_CATALOG[0]||{}).kind||'Піца',name:nm.join('|'),size:+cm}}   /* a chosen pizza at its chosen diameter */
  if(nsFocus()){const [,cm,...nm]=FOCUS.split('|');return{kind:'Піца',name:nm.join('|'),size:+cm,ns:1}}
- if(S.ns){const pool=[],pt=S.panType;if(!pt||pt==='k_pizza')recipesByFormat.k_pizza().forEach(n=>pool.push([n,101]));if(!pt||pt==='cupcakes')recipesByFormat.cupcakes().forEach(n=>pool.push([n,102]));if(!pt||pt==='sandwich')recipesByFormat.sandwich().forEach(n=>pool.push([n,103]));const [name,size]=pickOne(pool);return{kind:'Піца',name,size,ns:1}}   /* each format draws only from its own menu */   /* non-standard orders come ONLY from TECH_NS */
+ if(S.ns){const pool=nsPool(S.panType);if(queued())return pickQ(pool);const o=pickOne(pool);return{kind:'Піца',name:o.name,size:o.size,ns:1}}   /* each format draws only from its own menu */   /* non-standard orders come ONLY from TECH_NS */
+ if(queued()){const pool=stdPool();if(pool.length)return pickQ(pool)}   /* every recipe x size once per session */
  const p=pickOne(ORDER_CATALOG),foc=currentGameMode==='focus'&&FOCUS&&TECH[FOCUS],name=foc?FOCUS:pickOne([...new Set([...p.names,...Object.keys(TECH)])]),sz=pizzaSizes(name),all=sz.length?sz:p.sizes();
  let last=null;try{last=+sessionStorage.getItem('pzLastSize')}catch(e){}
  const size=pickOne(foc&&all.length>1?all.filter(s=>s!==last):all);   /* targeted mode: only this pizza, random size, never the same size twice in a row */
@@ -1803,7 +1879,9 @@ function checkSize(notify){
  if(mis&&notify)toast(`Розмір не збігається: замовлено ${szT(ORDER.size)}, обрано ${szT(made)}`);
 }
 async function showOrder(){
- if(showOrder.busy)return;showOrder.busy=1;
+ if(showOrder.busy)return;
+ if(exhausted()){showDone();return}   /* reloaded with a finished queue: show the completion dialog again */
+ showOrder.busy=1;
  const app=$('#app'),ov=$('#ordOv'),card=$('#ordCard'),slot=$('#ordSlot');
  ORDER=genOrder();card.querySelector('b').textContent=orderText(ORDER);
  if(currentGameMode==='all'&&!!ORDER.ns!==!!S.ns&&S.phase==='rim')setCat(!!ORDER.ns);   /* the cycle switches to the category / format of the dropped tech card */
@@ -1868,23 +1946,57 @@ const focusStore={get:()=>{try{return sessionStorage.getItem('pzFocus')}catch(e)
 let FOCUS=null,PICK=[];
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
  pizzaSizes=n=>Object.keys(TECH[n]||{}).map(Number).filter(cm=>Object.values(SIZES).some(s=>s.cm===cm)).sort((a,b)=>a-b);   /* sizes that have a tech card */
-function openPick(){PICK=[...Object.keys(TECH).map(n=>({key:n,label:n,sub:pizzaSizes(n).join(' · ')+' см'})),...Object.entries(TECH_NS).flatMap(([n,z])=>Object.keys(z).filter(cm=>Object.values(SIZES).some(v=>v.ns&&v.cm===+cm)).map(cm=>({key:`ns|${cm}|${n}`,label:n,sub:szT(+cm)})))];$('#pickList').innerHTML=PICK.map((e,i)=>`<button type="button" data-i="${i}">${esc(e.label)}<small>${esc(e.sub)}</small></button>`).join('');$('#ssMenu').style.display='none';$('#pickPanel').classList.add('on')}
-const closePick=()=>{$('#pickPanel').classList.remove('on');$('#ssMenu').style.display=''};
+const PK_TABS=[['all','Усі'],['std','Стандартні піци'],['k','К-Піца'],['c','Піца-капкейки'],['w','Піца-сендвічі']],
+ PK_FMT={101:['k','К-Піца','#67e8f9','rgba(6,182,212,.14)','rgba(6,182,212,.5)'],102:['c','Капкейки','#f9a8d4','rgba(236,72,153,.14)','rgba(236,72,153,.5)'],103:['w','Сендвіч','#fde047','rgba(234,179,8,.14)','rgba(234,179,8,.5)']};
+let pkTab='all',pkQ='';
+function pkEntries(){
+ const a=Object.keys(TECH).map(n=>({fmt:'std',label:n,sizes:pizzaSizes(n)})).filter(e=>e.sizes.length);
+ Object.entries(TECH_NS).forEach(([n,z])=>Object.keys(z).filter(cm=>PK_FMT[cm]&&Object.values(SIZES).some(v=>v.ns&&v.cm===+cm)).forEach(cm=>a.push({fmt:PK_FMT[cm][0],label:n,cm:+cm})));
+ return a}
+function renderPick(){
+ $('#pkTabs').innerHTML=PK_TABS.map(([k,n])=>`<button type="button" class="pk-tab${k===pkTab?' on':''}" data-t="${k}">${n}</button>`).join('');
+ const q=pkQ.trim().toLowerCase(),list=pkEntries().filter(e=>(pkTab==='all'||e.fmt===pkTab)&&(!q||e.label.toLowerCase().includes(q)));
+ $('#pickList').innerHTML=list.length?list.map(e=>e.fmt==='std'
+  ?`<div class="pk-card std"><span class="pk-n">${esc(e.label)}</span><span class="pk-sz">${e.sizes.map(cm=>`<button type="button" data-k="${esc('std|'+cm+'|'+e.label)}">${cm} см</button>`).join('')}</span></div>`
+  :(f=>`<button type="button" class="pk-card" data-k="${esc('ns|'+e.cm+'|'+e.label)}"><span class="pk-n">${esc(e.label)}</span><span class="pk-b" style="--bc:${f[2]};--bb:${f[3]};--bd:${f[4]}">${f[1]}</span></button>`)(PK_FMT[e.cm])).join(''):'<div id="pkEmpty">Нічого не знайдено</div>'}
+function openPick(tab){
+ pkTab=PK_TABS.some(t=>t[0]===tab)?tab:'all';pkQ='';$('#pkSearch').value='';renderPick();
+ $('#ssMenu').style.display='none';$('#startScr').classList.add('picking');$('#pickPanel').classList.add('on')}
+const closePick=()=>{$('#pickPanel').classList.remove('on');$('#startScr').classList.remove('picking');$('#ssMenu').style.display=''};
 function startFocus(n){FOCUS=n;focusStore.set(n);closePick();startGame('focus')}
-$('#ssPick').addEventListener('click',()=>RECIPES_READY.then(openPick));   /* catalog is read after recipes.json has been applied */
+$('#ssPick').addEventListener('click',()=>RECIPES_READY.then(()=>openPick('all')));   /* catalog is read after recipes.json has been applied */
 $('#pickBack').addEventListener('click',closePick);
-$('#pickList').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)startFocus(PICK[+b.dataset.i].key)});   /* add ids here (and remove `disabled` on their buttons) to unlock a mode */
+$('#pickList').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b)startFocus(b.dataset.k)});
+$('#pkTabs').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(b){pkTab=b.dataset.t;renderPick()}});
+$('#pkSearch').addEventListener('input',e=>{pkQ=e.target.value;renderPick()});
 let currentGameMode=null;   /* 'pizza' | 'custom' | 'all' - pick per-mode catalogs inside genOrder() when they exist */
 const modeStore={get:()=>{try{return sessionStorage.getItem('pzMode')}catch(e){return null}},set:m=>{try{m?sessionStorage.setItem('pzMode',m):sessionStorage.removeItem('pzMode')}catch(e){}}};
 function restartSession(mode){                      /* fade out -> reset the whole session (reload) -> mode is restored on load */
  modeStore.set(mode);if(!mode)focusStore.set(null);document.body.style.transition='opacity .35s ease';document.body.style.opacity=0;
  setTimeout(()=>location.reload(),370);
 }
-const nextOrder=()=>restartSession(currentGameMode);   /* "Нове замовлення" after a finished pizza: same mode, new order modal */
-const exitToMenu=()=>restartSession(null);              /* "В меню": back to the start screen */
-function applyMode(m){if(m==='custom'||(m==='focus'&&nsFocus())){S.ns=true;S.size='K';S.panType=null;S.hasCheeseRim=false;refresh();panel()}}   /* «Нестандартні піци»: only TECH_NS orders, pan view from the first step */
+const singleRecipe=()=>currentGameMode==='focus';   /* single_recipe: a pizza (and diameter) chosen on «Оберіть піцу» */
+function singleRepeat(){restartSession('focus')}   /* same FOCUS key (name + size) stays in sessionStorage -> identical order from scratch */
+function singleBack(){const tab=ORDER&&ORDER.ns?(PK_FMT[ORDER.size]?PK_FMT[ORDER.size][0]:'all'):'std';try{sessionStorage.setItem('pzOpenPick',tab)}catch(e){}restartSession(null)}
+function nextOrder(){
+ if(queued()&&ORDER)doneStore.add(oKey(ORDER));                 /* the finished pizza leaves the session queue */
+ if(exhausted())return showDone();                              /* last recipe done: modal instead of a new order */
+ restartSession(currentGameMode);
+}   /* "Нове замовлення" after a finished pizza: same mode, new order modal */
+const exitToMenu=()=>{doneStore.clear();restartSession(null)};              /* "В меню": back to the start screen */
+function applyMode(m){if(m==='pizza'||m==='focus')panel();if(m==='custom'||(m==='focus'&&nsFocus())){S.ns=true;S.size='K';S.panType=null;S.hasCheeseRim=false;refresh();panel()}}   /* «Нестандартні піци»: only TECH_NS orders, pan view from the first step */
+/* ---- «Усі піци пройдено!» modal ---- */
+function showDone(){
+ const m=$('#doneM');if(!m)return;
+ try{$('#ordOv').style.display='none'}catch(e){}
+ m.classList.add('on');
+}
+function doneRepeat(){doneStore.clear();$('#doneM').classList.remove('on');restartSession(currentGameMode)}
+function donePick(){const tab=currentGameMode==='pizza'?'std':currentGameMode==='custom'&&ORDER&&PK_FMT[ORDER.size]?PK_FMT[ORDER.size][0]:'all';doneStore.clear();try{sessionStorage.setItem('pzOpenPick',tab)}catch(e){}$('#doneM').classList.remove('on');restartSession(null)}
+function doneFinish(){doneStore.clear();$('#doneM').classList.remove('on');exitToMenu()}
 function startGame(m){
  if(!ACTIVE_MODES.includes(m))return;
+ doneStore.clear();   /* every entry from the start screen = a fresh session with the full pool */
  if(currentGameMode){if(getComputedStyle($('#startScr')).display!=='none'&&!$('#startScr').classList.contains('out')){focusStore.set(null);restartSession(m)}return}   /* stale session mode + visible menu: restart cleanly in the clicked mode */
  currentGameMode=m;modeStore.set(m);applyMode(m);const sc=$('#startScr');sc.classList.add('out');
  setTimeout(()=>{sc.style.display='none';RECIPES_READY.then(showOrder)},520);
@@ -1892,6 +2004,7 @@ function startGame(m){
 document.querySelectorAll('#startScr [data-mode]').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.mode)));
 $('#exitBtn').addEventListener('click',exitToMenu);
 refresh();panel();
+try{const t=sessionStorage.getItem('pzOpenPick');if(t){sessionStorage.removeItem('pzOpenPick');if(!ACTIVE_MODES.includes(modeStore.get()))RECIPES_READY.then(()=>openPick(t))}}catch(e){}   /* «Перейти до вибору піци» */
 if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();FOCUS=focusStore.get();applyMode(currentGameMode);RECIPES_READY.then(showOrder)}   /* training continues in the selected mode: new order right after the reload */
 </script>
 </body>
