@@ -389,6 +389,21 @@ body{background:#0b0f17;color:var(--ink);font-family:Manrope,system-ui,sans-seri
   </footer>
   <div id="toast"></div>
 
+  <!-- MODAL DELETE CONFIRM -->
+  <div id="delModal" style="display:none;position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeDeleteModal()">
+    <div style="width:100%;max-width:420px;background:#111726;border:1px solid rgba(255,255,255,.15);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden">
+      <div style="padding:20px 22px 6px;display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.45);display:flex;align-items:center;justify-content:center;font-size:18px">🗑️</div>
+        <h3 style="margin:0;font-size:16px;font-weight:800;color:#fff">Видалити технічну карту?</h3>
+      </div>
+      <p id="delMsg" style="margin:0;padding:8px 22px 18px 70px;font-size:13px;line-height:1.5;color:#94a3b8"></p>
+      <div style="padding:14px 22px;background:#0d1322;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:flex-end;gap:10px">
+        <button type="button" id="delCancel" onclick="closeDeleteModal()" class="st-btn">Скасувати</button>
+        <button type="button" onclick="confirmDelete()" style="padding:9px 18px;border-radius:12px;font-size:12px;font-weight:800;cursor:pointer;border:0;background:linear-gradient(90deg,#ef4444,#dc2626);color:#fff;box-shadow:0 6px 16px rgba(239,68,68,.3)">Видалити</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL EDIT / CREATE RECIPE -->
   <div id="editModal" class="absolute inset-0 z-40 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="w-full max-w-2xl max-h-[90vh] bg-[#111726] border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
@@ -721,7 +736,7 @@ function cardShell(key, fmt, name, badgesHTML, detailsHTML, icon) {
                     </h3>
                     <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
                         <button type="button" onclick="openModal(decodeURIComponent('${enc(name)}'), '${fmt}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition" title="Редагувати">✏️</button>
-                        <button type="button" onclick="deletePizza(decodeURIComponent('${enc(name)}'), '${fmt}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition" title="Видалити">🗑️</button>
+                        <button type="button" onclick="askDeletePizza(decodeURIComponent('${enc(name)}'), '${fmt}')" class="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition" title="Видалити">🗑️</button>
                     </div>
                 </div>
                 <div class="flex items-center justify-between pt-0.5">
@@ -812,6 +827,25 @@ function renderRecipesGrid() {
     });
     applySections();
 }
+
+let pendingDelete = null;
+function askDeletePizza(name, fmt = 'std') {
+    pendingDelete = { name, fmt };
+    document.getElementById('delMsg').textContent = `Ви дійсно хочете видалити ТК «${name}»? Цю дію неможливо скасувати.`;
+    const m = document.getElementById('delModal');
+    m.style.display = 'flex';
+    document.getElementById('delCancel').focus();
+}
+function closeDeleteModal() {
+    const m = document.getElementById('delModal');
+    m.style.display = 'none';
+    pendingDelete = null;
+}
+function confirmDelete() {
+    if (pendingDelete) deletePizza(pendingDelete.name, pendingDelete.fmt);
+    closeDeleteModal();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && pendingDelete) closeDeleteModal(); });
 
 function deletePizza(name, fmt = 'std') {
     if (fmt === 'std') delete RECIPES_DATA[name]; else delete RECIPES_NS[fmt][name];
