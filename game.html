@@ -568,6 +568,7 @@ function applyFile(d){   /* the published file is the base: its recipes REPLACE 
 }
 function cfgBadge(st){   /* a clear indicator when this browser's own admin overrides sit on top of / replace recipes.json */
  const has=st&&(st.std||st.ns||Object.keys(st.start.w||{}).length||Object.keys(st.start.step||{}).length||Object.keys(st.start.dough||{}).length||Object.keys(st.gfx||{}).length||Object.keys(st.book||{}).length||Object.keys(st.pos||{}).length);
+ if(!/[?&]debug=1/.test(location.search))return;   /* hidden for trainees; add ?debug=1 to see the config source */
  if(!has&&CFG_SRC==='file')return;
  const b=document.createElement('div');b.id='cfgBadge';
  b.innerHTML=has?'⚙ Локальні налаштування адміна поверх recipes.json <button type="button">Скинути</button>':'Вбудовані налаштування (recipes.json недоступний)';
