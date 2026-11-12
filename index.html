@@ -120,6 +120,20 @@
     return v > 0 ? Number(v) : PC.startDefault(cm, id);
   };
   PC.doughDefault = cm => (PC.sizes[PC.sizeKey[cm]] || {}).g;
+  /* default +/- step (grams per button press); null = the item has no +/- buttons (base sauces follow the TK) */
+  PC.stepDefault = function (cm, id) {
+    cm = Number(cm);
+    if (PC.isBaseSauce(id)) return null;
+    const it = byId[id], cat = it ? it.cat : null;
+    if (cat === 'gr') return (id === 'spi' || id === 'gon') ? 1 : 5;
+    if (cat === 'sauce') return 5;
+    if (id === 'ched') return 12.5;
+    return (cat === 'meat' || (cm === 103 && id === 'chi')) ? 5 : 10;
+  };
+  PC.stepW = function (overrides, cm, id) {
+    const v = overrides && overrides[cm] && overrides[cm][id];
+    return v > 0 ? Number(v) : PC.stepDefault(cm, id);
+  };
   /* drop overrides of ingredients that were removed from the registry and junk values; new ingredients simply have no override -> default */
   PC.sanitizeStart = function (w) {
     const out = {};
@@ -158,7 +172,7 @@
     const st = { schema: PC.schema, fromSchema: Number(o.schema) || 1, rev: Number(o.rev) || 0, registryVersion: o.registryVersion || null,
       std: o.std && typeof o.std === 'object' ? o.std : null, ns: o.ns && typeof o.ns === 'object' ? o.ns : null,
       created: o.created && typeof o.created === 'object' ? o.created : {},
-      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough) } };
+      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough), step: PC.sanitizeStart(o.start && o.start.step) } };
     return st;
   };
   PC.migrateLegacy = function () {
@@ -169,7 +183,7 @@
   };
   PC.saveState = function (state) {
     const o = { schema: PC.schema, rev: Date.now(), registryVersion: PC.version, std: state.std, ns: state.ns, created: state.created || {},
-      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough) } };
+      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough), step: PC.sanitizeStart(state.start && state.start.step) } };
     const ok = store.set(KEY, JSON.stringify(o));
     PC._lastRev = o.rev;
     try { if (PC._bc) PC._bc.postMessage({ type: 'config', rev: o.rev }); } catch (e) {}
@@ -214,9 +228,13 @@
 .cat-body.open .cat-inner{padding-bottom:4px}
 .st-card{background:#161d2b;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:14px 18px;box-shadow:0 10px 28px rgba(0,0,0,.3)}
 .st-card h3{font-size:13px;font-weight:800;color:#fff;margin:0 0 8px;display:flex;align-items:center;gap:8px}
-.st-head,.st-row{display:grid;grid-template-columns:34px minmax(0,1fr) repeat(var(--cols),104px);align-items:center;gap:10px}
+.st-head,.st-row{display:grid;grid-template-columns:34px minmax(0,1fr) repeat(var(--cols),92px);align-items:center;gap:10px}
 .st-head{font-size:10px;font-weight:800;color:#8b96a8;text-transform:uppercase;letter-spacing:.06em;padding:0 0 6px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px}
 .st-head span:nth-child(n+3){text-align:center}
+.st-head.sub{border-bottom:1px solid rgba(255,255,255,.08);margin-top:-4px;font-size:9px;text-transform:none;letter-spacing:0;color:#64748b;line-height:1.15;padding-bottom:6px}
+.st-head.grp{border-bottom:0;margin-bottom:0;padding-bottom:2px}
+.st-in input:disabled{opacity:.35}
+.st-dash{text-align:center;color:#475569;font-size:12px}
 .st-row{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .st-ico{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:16px}
 .st-name{font-size:12px;font-weight:700;color:#e8edf5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -570,6 +588,7 @@ let CREATED = {};          /* "fmt|name" -> createdAt (ms); fmt = std | cupcakes
 let sortMode = 'new';
 let START_OV = {};   /* { cm|formatId: { ingredientId: grams } } */
 let DOUGH_OV = {};   /* { cm|formatId: grams } */
+let STEP_OV = {};    /* { cm|formatId: { ingredientId: +/- step in grams } } */
 let searchQ = '';
 const openSec = { std: false, cupcakes: false, sandwich: false, k_pizza: false };   /* all sections start collapsed */
 const qHide = {};                                                                     /* manual collapse while a search is active */
@@ -581,7 +600,7 @@ if (sharedBoot) {
     if (sharedBoot.std) RECIPES_DATA = sharedBoot.std;
     if (sharedBoot.ns) Object.keys(NS_FORMATS).forEach(f => { if (sharedBoot.ns[f] && typeof sharedBoot.ns[f] === 'object') RECIPES_NS[f] = sharedBoot.ns[f]; });
     CREATED = sharedBoot.created || {};
-    START_OV = sharedBoot.start.w; DOUGH_OV = sharedBoot.start.dough;
+    START_OV = sharedBoot.start.w; DOUGH_OV = sharedBoot.start.dough; STEP_OV = sharedBoot.start.step || {};
 }
 try {
     const sm = localStorage.getItem('pizza_admin_sort');
@@ -613,7 +632,7 @@ function ensureCreated() {
 
 function saveAllLocal() {
     ensureCreated();
-    PC.saveState({ std: RECIPES_DATA, ns: RECIPES_NS, created: CREATED, start: { w: START_OV, dough: DOUGH_OV } }, 'admin');   /* versioned shared state: the simulator picks it up at once */
+    PC.saveState({ std: RECIPES_DATA, ns: RECIPES_NS, created: CREATED, start: { w: START_OV, dough: DOUGH_OV, step: STEP_OV } }, 'admin');   /* versioned shared state: the simulator picks it up at once */
 }
 if (sharedBoot && sharedBoot.fromSchema < PC.schema) setTimeout(saveAllLocal, 0);   /* one-time migration of the old separate localStorage keys */
 ensureCreated();
@@ -1190,25 +1209,31 @@ function renderStart() {
     box.style.setProperty('--ac', st.ac); box.style.setProperty('--rgb', st.rgb);
     document.getElementById('stPills').innerHTML = Object.entries(FMT_STYLE).map(([k, f]) =>
         `<button type="button" class="st-pill ${k === startFmt ? 'on' : ''}" style="--ac:${f.ac};--rgb:${f.rgb}" onclick="setStartFmt('${k}')"><span>${f.icon}</span>${f.title}</button>`).join('');
-    const colHead = cols.map(c => `<span>${c > 100 ? 'г' : c + ' см'}</span>`).join('');
+    const NC = cols.length * 2;
+    const grpHead = cols.map(c => `<span style="grid-column:span 2">${c > 100 ? '' : c + ' см'}</span>`).join('');
+    const subHead = cols.map(() => '<span>Стартова вага (г)</span><span>Крок +/- (г)</span>').join('');
     const inputs = id => cols.map(c => {
         const def = startDefault(c, id), ov = START_OV[c] && START_OV[c][id] > 0;
-        return `<label class="st-in"><input type="number" min="0" step="${def < 10 ? 1 : 5}" data-cm="${c}" data-id="${id}" value="${ov ? START_OV[c][id] : def}" placeholder="${def}" class="${ov ? 'ov' : ''}" oninput="onStartInput(this)" onchange="persistStart()"><i>г</i></label>`;
+        const sdef = PC.stepDefault(c, id), sov = STEP_OV[c] && STEP_OV[c][id] > 0;
+        const stepCell = sdef === null
+            ? '<span class="st-dash" title="Соус додається автоматично, без кнопок +/-">—</span>'
+            : `<label class="st-in"><input type="number" min="0" step="0.5" data-cm="${c}" data-id="${id}" data-step="1" value="${sov ? STEP_OV[c][id] : sdef}" placeholder="${sdef}" class="${sov ? 'ov' : ''}" oninput="onStartInput(this)" onchange="persistStart()"><i>г</i></label>`;
+        return `<label class="st-in"><input type="number" min="0" step="${def < 10 ? 1 : 5}" data-cm="${c}" data-id="${id}" value="${ov ? START_OV[c][id] : def}" placeholder="${def}" class="${ov ? 'ov' : ''}" oninput="onStartInput(this)" onchange="persistStart()"><i>г</i></label>` + stepCell;
     }).join('');
     const cats = [{ cat: 'Тісто (основа)', icon: '🫓', dough: true },
         { cat: 'Соуси основи', icon: '🥫', items: Object.keys(BASE_SAUCES).map(id => ({ id, name: BASE_SAUCES[id] })) }];
     INGREDIENTS_CATALOG.pre.forEach(g => cats.push(g));
     INGREDIENTS_CATALOG.post.forEach(g => { if (!(PC.formats[startFmt].noSauceToppings && g.id === 'sauce')) cats.push(g); });
     document.getElementById('stBody').innerHTML = cats.map(g => {
-        const head = `<div class="st-head" style="--cols:${cols.length}"><span></span><span>Інгредієнт</span>${colHead}</div>`;
+        const head = (cols.length > 1 ? `<div class="st-head grp" style="--cols:${NC}"><span></span><span></span>${grpHead}</div>` : '') + `<div class="st-head sub" style="--cols:${NC}"><span></span><span>${cols.length > 1 ? '' : 'Інгредієнт'}</span>${subHead}</div>`;
         let rows;
         if (g.dough) {
-            rows = `<div class="st-row" style="--cols:${cols.length}"><span class="st-ico">🫓</span><span class="st-name">Вага тіста (основи)</span>${cols.map(c => {
+            rows = `<div class="st-row" style="--cols:${NC}"><span class="st-ico">🫓</span><span class="st-name">Вага тіста (основи)</span>${cols.map(c => {
                 const ov = DOUGH_OV[c] > 0;
-                return `<label class="st-in"><input type="number" min="0" step="5" data-cm="${c}" data-dough="1" value="${doughOf(c)}" placeholder="${DOUGH_DEF[c]}" class="${ov ? 'ov' : ''}" oninput="onStartInput(this)" onchange="persistStart()"><i>г</i></label>`;
+                return `<label class="st-in"><input type="number" min="0" step="5" data-cm="${c}" data-dough="1" value="${doughOf(c)}" placeholder="${DOUGH_DEF[c]}" class="${ov ? 'ov' : ''}" oninput="onStartInput(this)" onchange="persistStart()"><i>г</i></label><span class="st-dash" title="Тісто не має кнопок +/-">—</span>`;
             }).join('')}</div>`;
         } else {
-            rows = g.items.map(i => `<div class="st-row" style="--cols:${cols.length}"><span class="st-ico">${PC.iconOf(i.id)}</span><span class="st-name">${esc(i.name)}</span>${inputs(i.id)}</div>`).join('');
+            rows = g.items.map(i => `<div class="st-row" style="--cols:${NC}"><span class="st-ico">${PC.iconOf(i.id)}</span><span class="st-name">${esc(i.name)}</span>${inputs(i.id)}</div>`).join('');
         }
         return `<div class="st-card" style="--ac:${st.ac};--rgb:${st.rgb}"><h3><span>${g.icon || st.icon}</span>${esc(g.cat)}</h3>${head}${rows}</div>`;
     }).join('');
@@ -1219,13 +1244,18 @@ function onStartInput(el) {
     const good = Number.isFinite(v) && v > 0;
     if (el.dataset.dough) {
         if (good && v !== DOUGH_DEF[cm]) DOUGH_OV[cm] = round2(v); else delete DOUGH_OV[cm];
+    } else if (el.dataset.step) {
+        const id = el.dataset.id;
+        STEP_OV[cm] = STEP_OV[cm] || {};
+        if (good && v !== PC.stepDefault(cm, id)) STEP_OV[cm][id] = round2(v); else delete STEP_OV[cm][id];
+        if (!Object.keys(STEP_OV[cm]).length) delete STEP_OV[cm];
     } else {
         const id = el.dataset.id;
         START_OV[cm] = START_OV[cm] || {};
         if (good && v !== startDefault(cm, id)) START_OV[cm][id] = round2(v); else delete START_OV[cm][id];
         if (!Object.keys(START_OV[cm]).length) delete START_OV[cm];
     }
-    el.classList.toggle('ov', good && (el.dataset.dough ? v !== DOUGH_DEF[cm] : v !== startDefault(cm, el.dataset.id)));
+    el.classList.toggle('ov', good && (el.dataset.dough ? v !== DOUGH_DEF[cm] : el.dataset.step ? v !== PC.stepDefault(cm, el.dataset.id) : v !== startDefault(cm, el.dataset.id)));
 }
 
 function persistStart(manual) {
@@ -1238,7 +1268,7 @@ function resetStart(go) {
     const c = document.getElementById('stConfirm'), b = document.getElementById('stResetBtn');
     if (go === undefined) { c.style.display = 'flex'; b.style.display = 'none'; return; }
     c.style.display = 'none'; b.style.display = '';
-    if (go) { START_OV = {}; DOUGH_OV = {}; persistStart(true); renderStart(); toast('↺ Скинуто до стандартних'); }
+    if (go) { START_OV = {}; DOUGH_OV = {}; STEP_OV = {}; persistStart(true); renderStart(); toast('↺ Скинуто до стандартних'); }
 }
 
 /* only complete, valid cards reach the file: TECH = round pizzas (25/30/35), TECH_NS = non-standard (101 K, 102 cupcakes, 103 sandwich) */
@@ -1261,6 +1291,7 @@ function buildRecipesJSON() {
         }
     }
     const out = { META: { schema: PC.schema, registryVersion: PC.version, exportedAt: new Date().toISOString() }, TECH, TECH_NS, ADMIN_META: { createdAt: Object.assign({}, CREATED) } };
+    out.STEP_W = JSON.parse(JSON.stringify(PC.sanitizeStart(STEP_OV)));                           /* user overrides of +/- steps, all formats */
     out.START_W = JSON.parse(JSON.stringify(PC.sanitizeStart(START_OV)));                         /* user overrides of start weights, all formats (new ingredients stay on registry defaults) */
     const sz = {};
     Object.entries(DOUGH_OV).forEach(([cm, g]) => { if (SIZE_KEY[cm]) sz[SIZE_KEY[cm]] = { g }; });
@@ -1352,6 +1383,7 @@ function importJSONFile(e) {
             try { std = normalizeImported(parsed); } catch (err) { if (!hasNS && !hasStart) throw err; }
             if (parsed && parsed.START_W) {   /* old exports without a start-weight block keep the current / default weights */
                 START_OV = {}; DOUGH_OV = {};
+                STEP_OV = PC.sanitizeStart(parsed.STEP_W);   /* old files without STEP_W simply reset steps to the defaults */
                 Object.entries(parsed.START_W || {}).forEach(([cm, o]) => { if (o && typeof o === 'object') Object.entries(o).forEach(([id, g]) => { if (Number(g) > 0) (START_OV[cm] = START_OV[cm] || {})[id] = Number(g); }); });
                 Object.entries(SIZE_KEY).forEach(([cm, k]) => { const g = parsed.SIZES && parsed.SIZES[k] && Number(parsed.SIZES[k].g); if (g > 0 && g !== DOUGH_DEF[cm]) DOUGH_OV[cm] = g; });
             }
@@ -1379,7 +1411,7 @@ function importJSONFile(e) {
 PC.subscribe(st => {
     if (st.std) RECIPES_DATA = st.std;
     if (st.ns) Object.keys(NS_FORMATS).forEach(f => { RECIPES_NS[f] = (st.ns[f] && typeof st.ns[f] === 'object') ? st.ns[f] : {}; });
-    CREATED = st.created || {}; START_OV = st.start.w; DOUGH_OV = st.start.dough;
+    CREATED = st.created || {}; START_OV = st.start.w; DOUGH_OV = st.start.dough; STEP_OV = st.start.step || {};
     renderRecipesGrid();
     const t = document.getElementById('tabStart');
     if (t && !t.classList.contains('hidden')) renderStart();
