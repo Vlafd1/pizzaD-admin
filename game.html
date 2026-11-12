@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -5,6 +6,192 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Піца — кінематографічний тренажер</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+/* ==== PIZZA_CONFIG: shared registry (identical copy in simulator.html and admin.html). Add a new ingredient as ONE object in PC.ingredients and keep both files in sync. ==== */
+/* shared registry + versioned state helpers (inlined in index.html; no separate file) */
+(function (root) {
+  'use strict';
+  const PC = { schema: 2, version: '2026.11.12' };
+
+  /* ---- categories: phase = before (pre) or after (post) the oven ---- */
+  PC.categories = [
+    { id: 'meat',  n: "М'ясо",             phase: 'pre'  },
+    { id: 'che',   n: 'Сири',              phase: 'pre'  },
+    { id: 'veg',   n: 'Овочі',             phase: 'pre'  },
+    { id: 'gr',    n: 'Спеції та зелень',  phase: 'post' },
+    { id: 'sauce', n: 'Соуси-топінги',     phase: 'post' }
+  ];
+
+  /* ---- ingredients. pre-oven: pp = pieces per 10 g, ts = piece size. post-oven greens: g = default grams, pp, ts.
+         topping sauces: g = default grams, c / c2 = line colours, conc:true = accent sauce ---- */
+  PC.ingredients = [
+    { id: 'pep', n: 'Пепероні', cat: 'meat', icon: '🍕', pp: 4, ts: .85 },
+    { id: 'sal', n: 'Салями', cat: 'meat', icon: '🥩', pp: 4, ts: .85 },
+    { id: 'shy', n: 'Шинка', cat: 'meat', icon: '🍖', pp: 3, ts: .7 },
+    { id: 'bac', n: 'Бекон', cat: 'meat', icon: '🥓', pp: 4, ts: .62 },
+    { id: 'bal', n: 'Балик', cat: 'meat', icon: '🥩', pp: 3, ts: .64 },
+    { id: 'hun', n: 'Мисливські ковбаски', cat: 'meat', icon: '🌭', pp: 4, ts: .7 },
+    { id: 'chk', n: 'Копчене куряче філе', cat: 'meat', icon: '🍗', pp: 8, ts: 1.3 },
+    { id: 'chi', n: 'Перець чілі', cat: 'veg', icon: '🌶️', pp: 14, ts: 1.1 },
+    { id: 'cor', n: 'Кукурудза', cat: 'veg', icon: '🌽', pp: 28, ts: 1.7 },
+    { id: 'oni', n: 'Маринована цибуля', cat: 'veg', icon: '🧅', pp: 6, ts: 1.1 },
+    { id: 'pin', n: 'Ананас', cat: 'veg', icon: '🍍', pp: 5, ts: 1.1 },
+    { id: 'cuc', n: 'Мариновані огірки', cat: 'veg', icon: '🥒', pp: 6, ts: .85 },
+    { id: 'tom', n: 'Помідор', cat: 'veg', icon: '🍅', pp: 10, ts: 1.1 },
+    { id: 'bel', n: 'Болгарський перець', cat: 'veg', icon: '🫑', pp: 10, ts: 1.1 },
+    { id: 'oli', n: 'Оливки', cat: 'veg', icon: '🫒', pp: 20, ts: 1.2 },
+    { id: 'mas', n: 'Маслини', cat: 'veg', icon: '🫒', pp: 20, ts: 1.2 },
+    { id: 'mus', n: 'Гриби печериці', cat: 'veg', icon: '🍄', pp: 37.4, ts: .7 },
+    { id: 'moz', n: 'Моцарела', cat: 'che', icon: '🧀', pp: 43.2, ts: 2.1 },
+    { id: 'ched', n: 'Чеддер', cat: 'che', icon: '🧀', pp: .8, ts: .28 },
+    { id: 'blu', n: 'Сир з блакитною пліснявою', cat: 'che', icon: '🧀', pp: 8, ts: 1.2 },
+    { id: 'mix', n: 'Мікс сирів', cat: 'che', icon: '🧀', pp: 60, ts: 1.5 },
+    { id: 'aru', n: 'Рукола', cat: 'gr', icon: '🥬', g: 20, pp: 14, ts: 1.2 },
+    { id: 'gon', n: 'Зелена цибуля', cat: 'gr', icon: '🌱', g: 5, pp: 34, ts: 2.1 },
+    { id: 'spi', n: 'Італійські спеції', cat: 'gr', icon: '🌿', g: 1, pp: 44, ts: 3 },
+    { id: 'ice', n: 'Айсберг', cat: 'gr', icon: '🥬', g: 20, pp: 12, ts: 1.2 },
+    { id: 'ter', n: 'Теріякі', cat: 'sauce', icon: '🥫', g: 40, c: '#4a2410', c2: '#a2602c' },
+    { id: 'sch', n: 'Світ чилі', cat: 'sauce', icon: '🥫', g: 40, c: '#d9381e', c2: '#ff8a5e' },
+    { id: 'cez', n: 'Цезаріо', cat: 'sauce', icon: '🥫', g: 40, c: '#efe1bd', c2: '#fffaea' },
+    { id: 'bur', n: 'Соус Бургер', cat: 'sauce', icon: '🥫', g: 40, c: '#c4683a', c2: '#efa76c' }
+  ];
+
+  /* ---- base sauces ---- */
+  PC.baseSauces = {
+    tomato: { n: 'Томатний соус', g: 60, c: '#c8321e', icon: '🍅' },
+    cream:  { n: 'Вершковий соус', g: 40, c: '#f6f8fb', icon: '🥛' },
+    bbq:    { n: 'Соус BBQ', g: 60, c: '#6b2a14', icon: '🔥' }
+  };
+
+  /* ---- dough sizes / formats. cm 101 / 102 / 103 are format ids, not centimetres ---- */
+  PC.sizes = {
+    S: { g: 200, cm: 25 }, M: { g: 250, cm: 30 }, L: { g: 400, cm: 35 },
+    K: { g: 125, cm: 101, ns: 1, n: 'К-Піца' },
+    C: { g: 120, cm: 102, ns: 1, n: 'Піца Капкейки' },
+    W: { g: 200, cm: 103, gm: 25, ns: 1, n: 'Піца-сендвіч' }
+  };
+  PC.formats = {   /* admin sections: key -> format id in TECH_NS + display data */
+    std:      { title: 'Стандартні піци', icon: '🍕', cms: [25, 30, 35], ac: '#f97316', rgb: '249,115,22' },
+    cupcakes: { title: 'Піца-капкейки',   icon: '🧁', cms: [102], fid: 102, ac: '#ec4899', rgb: '236,72,153', noSauceToppings: true },
+    sandwich: { title: 'Піца-сендвічі',   icon: '🥪', cms: [103], fid: 103, ac: '#eab308', rgb: '234,179,8' },
+    k_pizza:  { title: 'К-піца',          icon: '🥙', cms: [101], fid: 101, ac: '#06b6d4', rgb: '6,182,212' }
+  };
+  PC.sizeKey = { 25: 'S', 30: 'M', 35: 'L', 101: 'K', 102: 'C', 103: 'W' };
+
+  /* ---- start-weight rules (grams of the FIRST click of an ingredient) ---- */
+  PC.startRules = {
+    DEF_G: { pep: 60, hun: 30, shy: 30, bac: 30, bal: 50, chk: 30, blu: 30, chi: 5, oni: 30, pin: 30, oli: 10, mas: 10 },
+    FINE: ['chi', 'oli', 'mas'],              /* micro-dosed: never shifted by crust size */
+    SIZE_D: { 25: -10, 30: 0, 35: 20 }        /* round pizzas: shift by crust size */
+  };
+
+  /* ---- helpers ---- */
+  const byId = {}; PC.ingredients.forEach(i => { byId[i.id] = i; });
+  PC.rebuildIndex = () => { Object.keys(byId).forEach(k => delete byId[k]); PC.ingredients.forEach(i => { byId[i.id] = i; }); };
+  PC.ing = id => byId[id] || null;
+  PC.cat = id => PC.categories.find(c => c.id === id) || null;
+  PC.catOf = id => (byId[id] ? byId[id].cat : null);
+  PC.ids = (cat) => PC.ingredients.filter(i => i.cat === cat).map(i => i.id);
+  PC.byPhase = phase => PC.ingredients.filter(i => (PC.cat(i.cat) || {}).phase === phase);
+  PC.catalog = phase => PC.categories.filter(c => c.phase === phase).map(c => ({ id: c.id, cat: c.n, items: PC.ingredients.filter(i => i.cat === c.id).map(i => ({ id: i.id, name: i.n })) }));
+  PC.isBaseSauce = id => Object.prototype.hasOwnProperty.call(PC.baseSauces, id);
+  PC.nameOf = id => PC.isBaseSauce(id) ? PC.baseSauces[id].n : (byId[id] ? byId[id].n : id);
+  PC.iconOf = id => PC.isBaseSauce(id) ? PC.baseSauces[id].icon : (byId[id] && byId[id].icon) || '•';
+
+  /* default start weight for an ingredient / base sauce in a format (cm 25 / 30 / 35 or format id 101 / 102 / 103) */
+  PC.startDefault = function (cm, id) {
+    cm = Number(cm);
+    if (PC.isBaseSauce(id)) return cm > 100 ? (id === 'cream' ? 40 : 60) : (id === 'cream' ? (cm === 35 ? 80 : 40) : (cm === 35 ? 120 : 60));
+    const it = byId[id], cat = it ? it.cat : null;
+    if (it && (cat === 'gr' || cat === 'sauce')) return it.conc ? 20 : (it.g || 1);
+    if (cm > 100) {
+      if (id === 'ched') return 25;
+      if (id === 'chi' && (cm === 101 || cm === 103)) return 5;
+      if (cm === 103 && (id === 'oli' || id === 'mas')) return 10;
+      return 20;
+    }
+    const step = id === 'ched' ? 12.5 : (cat === 'meat' ? 5 : 10);
+    const R = PC.startRules, b = R.DEF_G[id] !== undefined ? R.DEF_G[id] : (cat === 'che' ? 50 : 30);
+    return R.FINE.includes(id) || id === 'ched' ? b : Math.max(step, b + (R.SIZE_D[cm] || 0));
+  };
+  /* effective weight = user override (if any, and the ingredient still exists) else the default from the registry */
+  PC.startW = function (overrides, cm, id) {
+    const v = overrides && overrides[cm] && overrides[cm][id];
+    return v > 0 ? Number(v) : PC.startDefault(cm, id);
+  };
+  PC.doughDefault = cm => (PC.sizes[PC.sizeKey[cm]] || {}).g;
+  /* drop overrides of ingredients that were removed from the registry and junk values; new ingredients simply have no override -> default */
+  PC.sanitizeStart = function (w) {
+    const out = {};
+    Object.entries(w || {}).forEach(([cm, o]) => {
+      if (!PC.sizeKey[cm] || !o || typeof o !== 'object') return;
+      Object.entries(o).forEach(([id, g]) => { if ((byId[id] || PC.isBaseSauce(id)) && Number(g) > 0) (out[cm] = out[cm] || {})[id] = Number(g); });
+    });
+    return out;
+  };
+  PC.sanitizeDough = function (d) {
+    const out = {};
+    Object.entries(d || {}).forEach(([cm, g]) => { if (PC.sizeKey[cm] && Number(g) > 0 && Number(g) !== PC.doughDefault(cm)) out[cm] = Number(g); });
+    return out;
+  };
+  /* admin stores non-standard cards per format {fmt:{name:tk}}; the simulator wants {name:{formatId:tk}} */
+  PC.nsToByName = function (ns) {
+    const out = {};
+    Object.entries(PC.formats).forEach(([fmt, f]) => {
+      if (!f.fid) return;
+      Object.entries((ns && ns[fmt]) || {}).forEach(([name, tk]) => { (out[name] = out[name] || {})[f.fid] = tk; });
+    });
+    return out;
+  };
+
+  /* ================= shared persistent state (versioned, merged with the registry on every read) =================
+     { schema, rev, registryVersion, std:{name:{25,30,35}}, ns:{fmt:{name:tk}}, created:{key:ts}, start:{w:{cm:{id:g}}, dough:{cm:g}} } */
+  const KEY = 'pizzaStudio.config', LEGACY = ['pizza_simulator_recipes', 'pizza_simulator_recipes_ns', 'pizza_admin_created', 'pizza_admin_start'];
+  const store = { get(k) { try { return root.localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { root.localStorage.setItem(k, v); return true; } catch (e) { return false; } } };
+
+  PC.loadState = function () {
+    let o = null;
+    try { o = JSON.parse(store.get(KEY) || 'null'); } catch (e) { o = null; }
+    if (!o || typeof o !== 'object') o = PC.migrateLegacy();
+    if (!o) return null;
+    /* forward-compatible merge: anything missing in an older cache is filled from defaults, junk is dropped */
+    const st = { schema: PC.schema, fromSchema: Number(o.schema) || 1, rev: Number(o.rev) || 0, registryVersion: o.registryVersion || null,
+      std: o.std && typeof o.std === 'object' ? o.std : null, ns: o.ns && typeof o.ns === 'object' ? o.ns : null,
+      created: o.created && typeof o.created === 'object' ? o.created : {},
+      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough) } };
+    return st;
+  };
+  PC.migrateLegacy = function () {
+    const j = k => { try { return JSON.parse(store.get(k) || 'null'); } catch (e) { return null; } };
+    const std = j(LEGACY[0]), ns = j(LEGACY[1]), cr = j(LEGACY[2]), st = j(LEGACY[3]);
+    if (!std && !ns && !cr && !st) return null;
+    return { schema: 1, rev: 0, std, ns, created: cr || {}, start: { w: (st && st.w) || {}, dough: (st && st.dough) || {} } };
+  };
+  PC.saveState = function (state) {
+    const o = { schema: PC.schema, rev: Date.now(), registryVersion: PC.version, std: state.std, ns: state.ns, created: state.created || {},
+      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough) } };
+    const ok = store.set(KEY, JSON.stringify(o));
+    PC._lastRev = o.rev;
+    try { if (PC._bc) PC._bc.postMessage({ type: 'config', rev: o.rev }); } catch (e) {}
+    try { root.dispatchEvent(new CustomEvent('pizza-config-changed', { detail: { rev: o.rev } })); } catch (e) {}
+    return ok ? o : null;
+  };
+  /* fn(state) fires when ANOTHER tab / window (storage event, BroadcastChannel) or this window (custom event) saves */
+  PC.subscribe = function (fn) {
+    let last = (PC.loadState() || {}).rev || 0, t = null;
+    const fire = () => { clearTimeout(t); t = setTimeout(() => { const st = PC.loadState(); if (st && st.rev !== last) { last = st.rev; if (st.rev !== PC._lastRev) fn(st); }   /* own saves are not echoed back */ }, 30); };
+    root.addEventListener('storage', e => { if (e.key === KEY || e.key === null) fire(); });
+    root.addEventListener('pizza-config-changed', fire);
+    try { if (!PC._bc && root.BroadcastChannel) PC._bc = new root.BroadcastChannel('pizza-studio'); if (PC._bc) PC._bc.addEventListener('message', fire); } catch (e) {}
+    return () => {};
+  };
+  try { if (root.BroadcastChannel) PC._bc = new root.BroadcastChannel('pizza-studio'); } catch (e) {}
+  PC.KEY = KEY;
+
+  root.PIZZA_CONFIG = PC;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap">
 <style>
 :root{--ink:#e8edf5;--mut:#8b96a8;--acc:#ff8a2a;--ok:#34c47c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
@@ -16,8 +203,20 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webki
 #oven .arch{position:absolute;left:6%;right:6%;top:12%;bottom:20%;border:10px solid #3b261a;border-radius:50% 50% 16px 16px/38% 38% 16px 16px;background:radial-gradient(#1c0b05,#050202);box-shadow:inset 0 0 70px #ff7a18aa,0 0 40px #ff6a0055}
 .fl{position:absolute;bottom:17%;width:17%;height:32%;transform-origin:50% 100%;background:radial-gradient(ellipse at 50% 100%,#fff3a0 0,#ffb21f 24%,#ff5a0a 54%,transparent 72%);will-change:transform;animation:fl .7s ease-in-out infinite alternate}
 @keyframes fl{from{transform:scale(.8,.75) skewX(-5deg)}to{transform:scale(1.1,1.2) skewX(6deg)}}
-#stage{position:relative;z-index:12;isolation:isolate;\1}
+#stage{position:relative;z-index:12;isolation:isolate}
+#fmtPick{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+#fmtPick.show{opacity:1;visibility:visible;transition:opacity .3s}
+.fmtCard{pointer-events:auto;cursor:pointer;width:min(31%,170px);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 10px 12px;border-radius:18px;background:linear-gradient(180deg,rgba(30,41,59,.92),rgba(15,23,42,.92));border:1.5px solid rgba(148,163,184,.28);color:#e5e7eb;text-align:center;font:inherit;transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s,border-color .22s,opacity .45s}
+.fmtCard svg{width:100%;height:auto;border-radius:12px;transition:box-shadow .22s,filter .22s}
+.fmtCard b{font-size:15px;font-weight:800;line-height:1.15}
+.fmtCard .fw{font-size:11px;font-weight:700;color:#fdba74;background:rgba(249,115,22,.14);border:1px solid rgba(249,115,22,.35);padding:2px 9px;border-radius:99px}
+.fmtCard .fb{margin-top:2px;width:100%;padding:8px 6px;border-radius:11px;font-size:12px;font-weight:800;color:#fff;background:linear-gradient(180deg,#fb923c,#ea580c);border:0;cursor:pointer}
+.fmtCard:hover,.fmtCard:focus-visible{transform:translateY(-4px) scale(1.02);border-color:#f97316;outline:0}
+.fmtCard:hover svg,.fmtCard:focus-visible svg{box-shadow:0 0 20px rgba(249,115,22,.35)}
+.fmtCard.out{opacity:0;transform:scale(.92);pointer-events:none}
+.fmtCard.sel{opacity:0;pointer-events:none;transform:translate(var(--dx,0),0) scale(1.12);transition:transform .5s cubic-bezier(.3,.7,.2,1),opacity .5s .1s}
 #stage::before{content:'';position:absolute;left:6%;right:6%;top:12%;bottom:-3%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.5),rgba(0,0,0,0));z-index:-1;pointer-events:none;transform:scale(var(--k,1));transition:transform .55s}
+#stage.swz::before{opacity:.35}#stage.swz.baked::before{opacity:0}
 #stage::after{content:'';position:absolute;inset:-6%;border-radius:50%;background:radial-gradient(circle,rgba(255,140,40,.5),rgba(255,140,40,0) 66%);z-index:-1;opacity:0;transition:opacity .5s;pointer-events:none}
 #stage.hot::after{opacity:1}
 #stage.lock{contain:layout size;flex:none}
@@ -28,15 +227,16 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webki
 #pz,#pz *,#pzBase,#pzBase *{pointer-events:none}#pz,#pzBase{width:100%;height:100%;display:block;overflow:visible}#pz{position:relative}#pzBase{position:absolute;inset:0}
 #crust{fill:#e6c283;transition:fill 2.2s,transform .55s ease}#dough{fill:#f4dfb2;transition:fill 2.2s,transform .55s ease}#crust,#dough,#bakeR,#gSauce,#melt{transform-origin:160px 160px}
 #bakeR,#melt{opacity:0;transition:opacity 2s,transform .55s ease}
-#stage.baked #crust{fill:#d8a548}#stage.baked #dough{fill:#eac677}#stage.baked #bakeR{opacity:1}
+#rmWide{stroke:#f6e4bd}#rmFold{stroke:#efca8a;transition:stroke 2.2s}#stage.baked #rmFold{stroke:#dcae55}#stage.baked #rmWide{stroke:#ecd08a}#stage.baked #crust{fill:#d8a548}#stage.baked #dough{fill:#eac677}#stage.baked #bakeR{opacity:1}
 #gIng{transition:filter 2.2s}#gSauce{transition:filter 2.2s,transform .55s ease}#gMold{opacity:0;transition:opacity 1.8s ease-in .4s}
 
 
 .it{transition:transform .45s cubic-bezier(.25,1,.5,1),opacity .3s}
 #sFill{opacity:0;transition:opacity .6s}
 .fly{position:fixed;z-index:60;pointer-events:none;will-change:transform}
-#spoon{position:fixed;width:120px;height:120px;opacity:0;z-index:70;pointer-events:none}
-.tab{padding:6px 16px;border-radius:99px;background:rgba(255,255,255,.07);font-weight:700;font-size:.85rem}
+#stage.ns #crust,#stage.ns #dough,#stage.ns #bakeR,#stage.ns #gSauce,#stage.ns #gRim{display:none}#nsLayer{display:none}#stage.ns #nsLayer{display:block}#stage.baked #kDough{fill:#e6c27a}#stage.baked .cDisc{fill:#e2bd72}.sz.ns{background:#1e293b;color:#cbd5e1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 3px;transition:box-shadow .2s,background .2s}.sz.ns .pico{width:30px;height:18px;min-height:18px;flex:none;opacity:.6}.sz.ns b{font-size:.6rem;line-height:1.1;text-align:center;display:block}.sz.ns small{color:#94a3b8}.sz.ns.on{background:linear-gradient(#f97316,#ea580c);color:#fff;box-shadow:0 0 16px rgba(249,115,22,.55)}.sz.ns.on .pico{opacity:1}.sz.ns.on small{color:#ffe7d1}.tabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px}.tabb{padding:4px 12px;border-radius:99px;border:1px solid #46526a;font-size:.72rem;font-weight:700;color:#aab4c6}.tabb.on{background:#ff9a3a;border-color:#ff9a3a;color:#1a0f05}#bag{position:fixed;width:84px;height:84px;opacity:0;z-index:70;pointer-events:none;left:0;top:0}#tbsp{position:fixed;width:170px;height:170px;opacity:0;z-index:70;pointer-events:none;will-change:transform,opacity}
+#spoon,#tsp{position:fixed;width:120px;height:120px;opacity:0;z-index:70;pointer-events:none;will-change:transform,opacity}
+.tab{flex:none;white-space:nowrap;padding:6px 16px;border-radius:99px;background:rgba(255,255,255,.07);font-weight:700;font-size:.85rem}
 .tab.on{background:var(--acc);color:#1a0f05}
 .stp{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);font-size:1.4rem;font-weight:800}
 .stp:active,.ing:active,.sauceb:active,.knifeb:active{transform:scale(.94)}
@@ -45,7 +245,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webki
 .ing{flex:none;width:76px;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;font-size:.62rem;line-height:1.1;text-align:center;color:var(--mut)}
 .ing svg{border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.1)}.ing.on svg{box-shadow:0 0 0 3px var(--acc),0 0 14px rgba(255,138,42,.6)}.ing.on{color:var(--ink)}
 .bdg{position:absolute;top:-2px;right:6px;background:var(--acc);color:#1a0f05;border-radius:99px;font-style:normal;font-weight:800;font-size:.62rem;padding:1px 6px}
-.sauceb{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700;font-size:.8rem}
+.sauceb:focus-visible{outline:2px solid #ff9a3a;outline-offset:4px;border-radius:14px}.sauceb{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700;font-size:.8rem}
 .knifeb{display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:700;font-size:.8rem;padding:6px 8px;border-radius:16px;background:rgba(255,255,255,.06)}
 .sz{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;transition:.2s}
 .sz b{font-size:1rem}.sz small{font-size:.58rem;color:var(--mut)}.sz.on{background:var(--acc);color:#1a0f05;box-shadow:0 0 16px rgba(255,138,42,.5)}.sz.on small{color:#4a2a0c}.sz:disabled{opacity:.4}
@@ -61,7 +261,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webki
 .bx i{position:absolute;inset:9%;background:#f4efe0;transform:rotate(5deg);box-shadow:0 2px 8px rgba(0,0,0,.25);background-image:linear-gradient(135deg,transparent 48%,rgba(0,0,0,.05) 50%,transparent 52%)}
 .lid{z-index:14;filter:drop-shadow(0 10px 14px rgba(0,0,0,.45));align-items:center;justify-content:center;font-weight:800;letter-spacing:.2em;color:#6b4620;font-size:1.3rem;transform-origin:50% 0}
 .shake{animation:shk .4s}@keyframes shk{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-#done{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:rgba(6,9,14,.82);text-align:center}
+#done{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:safe center;padding:20px 20px 36px;background:rgba(6,9,14,.82);text-align:center;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}#done>*{flex-shrink:0}
 .spark{position:absolute;width:8px;height:8px;border-radius:50%;animation:spk 1.8s ease-out forwards}
 @keyframes spk{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
 .undo{margin-top:6px;padding:6px 12px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-weight:700;font-size:.78rem;color:var(--ink)}.undo:disabled{opacity:.35;cursor:default}.undo:not(:disabled):active{transform:scale(.95)}
@@ -142,10 +342,11 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
   </header>
   <main id="arena" class="relative flex-1 min-h-0 flex items-center justify-center p-2">
     <div id="hint"></div>
+    <div id="fmtPick" role="group" aria-label="Оберіть формат"></div>
     <button id="exitBtn" type="button" aria-label="Вийти в меню">← В меню</button>
     <div id="unit"><div class="bx" id="bx"><b class="bxo"></b><b class="bxn"></b><i></i></div>
-    <div id="stage"><svg id="pzBase" viewBox="0 0 320 320" aria-hidden="true"><circle id="crust" cx="160" cy="160" r="150"/><circle id="dough" cx="160" cy="160" r="136"/><circle id="bakeR" cx="160" cy="160" r="150" fill="url(#bk)"/>
-      <g id="gSauce"><circle id="sFill" cx="160" cy="160" r="131"/><path id="sPath" fill="none" stroke-width="13" stroke-linecap="round"/></g></svg>
+    <div id="stage"><svg id="pzBase" viewBox="0 0 320 320" aria-hidden="true"><circle id="crust" cx="160" cy="160" r="150"/><circle id="dough" cx="160" cy="160" r="136"/><g id="gRim" style="transform-origin:160px 160px"><circle id="rmWide" cx="160" cy="160" r="145" fill="none" stroke-width="0"/><circle id="rmGroove" cx="160" cy="160" r="141" fill="none" stroke="#d9b672" stroke-width="10" opacity="0"/><circle id="rmCreamSh" cx="160" cy="160" r="141" fill="none" stroke="#d8cfa4" stroke-width="11.5" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" style="transform:rotate(-90deg);transform-origin:160px 160px" opacity="0"/><circle id="rmCream" cx="160" cy="160" r="141" fill="none" stroke="#fffdf0" stroke-width="9" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" style="transform:rotate(-90deg);transform-origin:160px 160px" opacity="0"/><circle id="rmFold" cx="160" cy="160" r="140" fill="none" stroke-width="0"/><circle id="rmHi" cx="160" cy="160" r="147" fill="none" stroke="#fff" stroke-width="3" opacity="0"/><circle id="rmSh" cx="160" cy="160" r="129.5" fill="none" stroke="#8a5a22" stroke-width="2.4" opacity="0"/><circle id="rmSeam" cx="160" cy="160" r="140" fill="none" stroke="#a87730" stroke-width="1.4" stroke-dasharray="2 5" opacity="0"/></g><circle id="bakeR" cx="160" cy="160" r="150" fill="url(#bk)"/>
+      <g id="gSauce"><circle id="sFill" cx="160" cy="160" r="131"/><path id="sPath" fill="none" stroke-width="13" stroke-linecap="round"/></g><g id="nsLayer"></g></svg>
     <svg id="pz" viewBox="0 0 320 320">
       <defs><radialGradient id="gl" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#fff3b8"/><stop offset=".45" stop-color="#f6cf5e"/><stop offset="1" stop-color="#e2a52f"/></radialGradient>
       <radialGradient id="bk" cx="50%" cy="50%" r="50%"><stop offset=".72" stop-color="#c98b2c" stop-opacity="0"/><stop offset="1" stop-color="#b8791f" stop-opacity=".42"/></radialGradient><filter id="bump" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="7" result="n"/><feDiffuseLighting in="n" lighting-color="#fff" surfaceScale="4.5" result="l"><feDistantLight azimuth="225" elevation="52"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in"/></filter>
@@ -154,7 +355,7 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
       <radialGradient id="btint"><stop offset="0" stop-color="#7f9bbb" stop-opacity=".38"/><stop offset="1" stop-color="#7f9bbb" stop-opacity="0"/></radialGradient>
       <clipPath id="mclip"><circle id="mclipC" cx="160" cy="160" r="125"/></clipPath><radialGradient id="gold"><stop offset="0" stop-color="#dca33b" stop-opacity=".6"/><stop offset="1" stop-color="#dca33b" stop-opacity="0"/></radialGradient><mask id="cmask" maskUnits="userSpaceOnUse" x="0" y="0" width="320" height="320"><rect width="320" height="320" fill="#fff"/><g id="cmaskHoles" fill="#000" filter="url(#soft)"></g></mask><linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fa"/><stop offset=".5" stop-color="#b9c2ce"/><stop offset="1" stop-color="#8d98a7"/></linearGradient><clipPath id="mcut"></clipPath><radialGradient id="gold2"><stop offset="0" stop-color="#b8701c" stop-opacity=".8"/><stop offset=".55" stop-color="#c98a2a" stop-opacity=".38"/><stop offset="1" stop-color="#c98a2a" stop-opacity="0"/></radialGradient><radialGradient id="edgeDark"><stop offset="0" stop-color="#7a3e14" stop-opacity=".10"/><stop offset=".6" stop-color="#5a2a0e" stop-opacity=".14"/><stop offset="1" stop-color="#37140a" stop-opacity=".62"/></radialGradient></defs>
       
-      <g id="gShade"></g><g id="gIng"></g><circle id="roast" cx="160" cy="160" r="120" fill="#a8651c" style="opacity:0;transition:opacity 2.4s ease-in-out"/><g id="meltW"><circle id="melt" cx="160" cy="160" r="0"/><g id="cheeseB" style="opacity:0"></g></g><g id="meltDeco" clip-path="url(#mcut)" style="opacity:0;transition:opacity 3s"></g><g id="gMold" clip-path="url(#mcut)"></g><g id="toastG" clip-path="url(#mcut)"></g><g id="gCut"></g><g id="gPost"></g>
+      <defs id="symDefs"></defs><g id="gShade"></g><g id="gIng"></g><circle id="roast" cx="160" cy="160" r="120" fill="#a8651c" style="opacity:0;transition:opacity 2.4s ease-in-out"/><g id="meltW"><circle id="melt" cx="160" cy="160" r="0"/><g id="cheeseB" style="opacity:0"></g></g><g id="meltDeco" clip-path="url(#mcut)" style="opacity:0;transition:opacity 3s"></g><g id="gMold" clip-path="url(#mcut)"></g><g id="toastG" clip-path="url(#mcut)"></g><g id="gCut"></g><g id="gPost"></g>
       <g id="gKnife" style="opacity:0"></g>
     </svg><svg id="pzFx" viewBox="0 0 320 320" aria-hidden="true"><g id="fxCut"></g><g id="fxPost"></g><g id="fxKnife" style="opacity:0"></g></svg></div>
     <div class="lid" id="lid"><b class="bxo"></b><b class="bxn"></b><span>СМАЧНОГО</span></div></div>
@@ -170,28 +371,31 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
     <h2>Почати тренування:</h2>
     <div class="ss-btns" id="ssMenu">
       <button type="button" class="ss-main" data-mode="pizza">Піци</button>
-      <button type="button" data-mode="custom" disabled>Нестандартні піци</button>
-      <button type="button" data-mode="all" disabled>Всі формати піц</button>
+      <button type="button" class="ss-main" data-mode="custom">Нестандартні піци</button>
+      <button type="button" class="ss-main" data-mode="all">Всі формати піц</button>
       <button type="button" id="ssPick">🎯 Обрати піцу для тренування</button>
     </div>
     <div class="ss-pick" id="pickPanel"><h3>Оберіть піцу:</h3><div class="ss-btns" id="pickList"></div><button type="button" id="pickBack">← Назад</button></div>
   </div>
-  <script>try{if(['pizza','focus'].includes(sessionStorage.getItem('pzMode')))document.getElementById('startScr').style.display='none'}catch(e){}</script>
+  <script>try{if(['pizza','focus','custom'].includes(sessionStorage.getItem('pzMode')))document.getElementById('startScr').style.display='none'}catch(e){}</script>
   <div id="ordOv"><div id="ordBd"></div><div id="ordCard"><small>Нове замовлення</small><b></b></div></div>
   <div id="done"></div>
 </div>
-<svg id="spoon" viewBox="0 0 120 120"><line x1="30" y1="80" x2="112" y2="6" stroke="#aeb8c6" stroke-width="4" stroke-linecap="round"/><line x1="88" y1="28" x2="112" y2="6" stroke="#2f6fe0" stroke-width="7" stroke-linecap="round"/><circle id="spBowl" cx="30" cy="80" r="12" fill="#c0c8d4" stroke="#7d8a9c" stroke-width="2"/></svg>
+<svg id="bag" viewBox="0 0 100 100"><polygon points="10,90 54,14 86,46" fill="#f5f7fa" stroke="#8d9aae" stroke-width="2.2" stroke-linejoin="round"/><path d="M26 62 L60 36 M36 74 L70 52" stroke="#c7d0de" stroke-width="2" fill="none"/><ellipse cx="70" cy="30" rx="8" ry="19" transform="rotate(45 70 30)" fill="#e9eef5" stroke="#8d9aae" stroke-width="2"/><polygon points="10,90 15,80 21,86" fill="#cfd6e2" stroke="#8d9aae" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="90" r="2.4" fill="#fffdf0"/></svg><svg id="spoon" viewBox="0 0 120 120"><line x1="30" y1="80" x2="112" y2="6" stroke="#aeb8c6" stroke-width="4" stroke-linecap="round"/><line x1="88" y1="28" x2="112" y2="6" stroke="#2f6fe0" stroke-width="7" stroke-linecap="round"/><circle id="spBowl" cx="30" cy="80" r="12" fill="#c0c8d4" stroke="#7d8a9c" stroke-width="2"/></svg><svg id="tbsp" viewBox="0 0 120 120"><path d="M38 72L102 12" stroke="#7d8a9c" stroke-width="7.4" stroke-linecap="round"/><path d="M38 72L102 12" stroke="url(#tspG)" stroke-width="5" stroke-linecap="round"/><path d="M92 21L110 5" stroke="#cfd6e0" stroke-width="9" stroke-linecap="round"/><g transform="rotate(-43 30 80)"><ellipse cx="30" cy="80" rx="19" ry="12.5" fill="url(#tspG)" stroke="#7d8a9c" stroke-width="2"/><ellipse id="tbspBowl" cx="30" cy="80" rx="15" ry="9.5" fill="#c0c8d4"/><ellipse cx="24" cy="76" rx="6" ry="2.4" fill="#fff" opacity=".55"/></g></svg><svg id="tsp" viewBox="0 0 120 120"><defs><linearGradient id="tspG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fa"/><stop offset=".5" stop-color="#aab4c2"/><stop offset="1" stop-color="#e6ebf1"/></linearGradient></defs><path d="M37 74L100 14" stroke="#7d8a9c" stroke-width="5.6" stroke-linecap="round"/><path d="M37 74L100 14" stroke="url(#tspG)" stroke-width="3.6" stroke-linecap="round"/><path d="M92 21L108 6" stroke="#cfd6e0" stroke-width="7" stroke-linecap="round"/><g transform="rotate(-43 30 80)"><ellipse cx="30" cy="80" rx="15" ry="10" fill="url(#tspG)" stroke="#7d8a9c" stroke-width="1.8"/><ellipse id="tspBowl" cx="30" cy="80" rx="11.5" ry="7" fill="#c0c8d4"/><ellipse cx="26" cy="77.5" rx="5" ry="2" fill="#fff" opacity=".55"/></g></svg>
 <script>
+const PC=window.PIZZA_CONFIG;   /* single source of truth: ingredients / categories / sizes / start weights */
 const $=s=>document.querySelector(s),NS='http://www.w3.org/2000/svg',wait=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---- 1) admin dashboard sync: recipes.json is requested first thing; missing / broken file or timeout -> built-in defaults ---- */
 const RECIPES_READY=Promise.race([
- fetch('recipes.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{applyRecipes(d);return true}),
+ (/^file:/.test(document.baseURI)?Promise.reject(new Error('file://')):fetch('recipes.json',{cache:'no-store'})).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{applyRecipes(d);return true}),
  new Promise(r=>setTimeout(()=>r(false),2500))
-]).catch(()=>false);   /* always resolves: game start / first order wait for it */
+]).catch(()=>false).then(r=>{try{applyStore(PC.loadState())}catch(e){console.warn('shared config',e)}return r});   /* always resolves: game start / first order wait for it */
+PC.subscribe(st=>RECIPES_READY.then(()=>applyStore(st,true)),'sim');   /* admin saved a TK / start weight in another tab: picked up without reloading */
+const cleanName=n=>String(n).replace(/\s*\((?:кубик|слайс|пластин|шматоч|кільц|півкільц|стружк)[^)]*\)/gi,'').replace(/\s+(?:кубиком|кубиками|слайсами|пластинками|шматочками|кільцями|півкільцями|стружкою|соломкою)(?![а-яіїєґ])/gi,'').replace(/\s*\(?(?:хвиляста|спіральна) лінія\)?/gi,'').replace(/\s{2,}/g,' ').trim();   /* product names carry no cut form / sauce style */
 function adminToTech(tk){   /* native dashboard format (ings / post arrays, pat string) -> tech card; null = incomplete */
  if(!tk||!Array.isArray(tk.ings))return tk;
  const n=v=>(v===''||v===null||typeof v==='boolean')?NaN:Number(v),o={total:n(tk.total),sauce:n(tk.sauce)},ids=[],post={};
- if(tk.sauceId)o.sauceId=tk.sauceId;
+ if(tk.sauceId)o.sauceId=tk.sauceId;if(tk.hasCheeseRim===true||tk.cheeseRim===true||tk.rim===true)o.hasCheeseRim=true;   /* the cheese rim belongs to the recipe (tech card), not to the order */
  for(const i of tk.ings){const g=n(i&&i.g);if(!i||!i.id||!(g>0))return null;o[i.id]=(o[i.id]||0)+g;ids.push(i.id)}
  if(!ids.length)return null;
  if(new Set(ids).size<ids.length)o.layers=ids;   /* repeated ingredient = stacking order (mozzarella under and over pepperoni) */
@@ -200,36 +404,54 @@ function adminToTech(tk){   /* native dashboard format (ings / post arrays, pat 
  if(typeof tk.pat==='string'&&tk.pat!=='none'){const t=Object.keys(post).filter(id=>['bur','ter','sch','cez'].includes(id));if(t.length){o.pat={};t.forEach(id=>{o.pat[id]=tk.pat})}}
  return o;
 }
+/* the shared state saved by the admin (same origin) is authoritative: TK base + start weights + dough weights, merged with the registry defaults */
+/* a new registry ingredient without its own picture is drawn as a generic piece (colour from the registry) */
+function ensureSprites(){[...ING,...POST].forEach(i=>{if(!SH[i.id]){const c=(PC.ing(i.id)||{}).color||'#c9a063';SH[i.id]=k=>`<circle r="${(4+((k||0)%3)*.6).toFixed(1)}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`}})}
+function applyStore(st,live){
+ ensureSprites();
+ if(!st)return;
+ const bakT={...TECH},bakN={...TECH_NS};
+ if(st.std)Object.keys(TECH).forEach(k=>delete TECH[k]);
+ if(st.ns)Object.keys(TECH_NS).forEach(k=>delete TECH_NS[k]);
+ Object.keys(START_W).forEach(k=>delete START_W[k]);
+ Object.keys(PC.sizes).forEach(k=>{SIZES[k].g=PC.sizes[k].g});
+ const sz={};Object.entries(st.start.dough||{}).forEach(([cm,g])=>{const k=PC.sizeKey[cm];if(k)sz[k]={g}});
+ applyRecipes({TECH:st.std||undefined,TECH_NS:st.ns?PC.nsToByName(st.ns):undefined,START_W:st.start.w,SIZES:sz});
+ if(!Object.keys(TECH).length)Object.assign(TECH,bakT);   /* an empty / broken base never leaves the game without recipes */
+ if(!Object.keys(TECH_NS).length)Object.assign(TECH_NS,bakN);
+ ORDER_CATALOG[0].names=Object.keys(TECH);
+ if(live){try{panel()}catch(e){}try{toast('Дані оновлено з адмін-панелі')}catch(e){}}
+}
 function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PPG} or a bare TECH object */
  if(!d||typeof d!=='object')return;
- const known=['TECH','SAUCES','SIZES','ING','POST','TOPS','PPG'],T=d.TECH||(known.some(k=>k in d)?null:d);
+ const known=['TECH','TECH_NS','SAUCES','SIZES','ING','POST','TOPS','PPG'],T=d.TECH||(known.some(k=>k in d)?null:d);
  const okTK=tk=>{if(!tk||typeof tk!=='object')return false;const num=v=>typeof v==='number'&&isFinite(v)&&v>=0,post=tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),
-  ing=Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat'].includes(k));
+  ing=Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat','rim','hasCheeseRim'].includes(k));
   return num(tk.total)&&tk.total>0&&num(tk.sauce)&&ing.length>0&&(!tk.sauceId||!!SAUCES[tk.sauceId])&&ing.every(k=>num(tk[k])&&ING.some(i=>i.id===k))&&Object.values(post).every(num)&&Object.keys(post).every(k=>POST.some(p=>p.id===k)||TOPS.some(t=>t.id===k))&&tk.total>Object.values(post).reduce((a,b)=>a+b,0)};   /* no NaN / negative / incomplete tech cards reach the weight math */
  if(T)for(const[n,z]of Object.entries(T)){if(!z||typeof z!=='object')continue;const ok={};for(const[cm,tk0]of Object.entries(z)){const tk=adminToTech(tk0);if(okTK(tk))ok[cm]=tk}if(Object.keys(ok).length)TECH[n]=ok}   /* dashboard recipes replace / extend the built-in tech cards (valid sizes only) */
+ if(d.TECH_NS&&typeof d.TECH_NS==='object')for(const[n,z]of Object.entries(d.TECH_NS)){if(!z||typeof z!=='object')continue;const ok={};for(const[cm,tk0]of Object.entries(z)){const tk=adminToTech(tk0);if(okTK(tk)&&(+cm===101||+cm===102||+cm===103))ok[cm]=tk}if(Object.keys(ok).length)TECH_NS[n]=ok}   /* non-standard recipes stay in their own table */
+ if(d.START_W&&typeof d.START_W==='object')for(const[cm,o]of Object.entries(d.START_W)){if(!o||typeof o!=='object')continue;const t=START_W[cm]=START_W[cm]||{};for(const[id,g]of Object.entries(o))if(typeof g==='number'&&isFinite(g)&&g>0)t[id]=g}   /* dashboard start weights */
  const mix=(dst,src)=>{for(const[k,v]of Object.entries(src||{}))dst[k]=v&&typeof v==='object'?Object.assign(dst[k]||{},v):v};
  mix(SAUCES,d.SAUCES);mix(SIZES,d.SIZES);mix(PPG,d.PPG);
  const byId=(arr,src)=>(src||[]).forEach(x=>{const o=arr.find(i=>i.id===x.id);if(o)Object.assign(o,x);else if(SH[x.id])arr.push(x)});   /* a new ingredient needs an SVG shape in SH */
- byId(ING,d.ING);byId(POST,d.POST);byId(TOPS,d.TOPS);
+ byId(ING,d.ING);byId(POST,d.POST);byId(TOPS,d.TOPS);[ING,POST,TOPS].forEach(a=>a.forEach(i=>{i.n=cleanName(i.n)}));
  ORDER_CATALOG[0].names=Object.keys(TECH);   /* order generator follows the dashboard catalog */
 }
 const rnd=s=>{s=Math.sin(s*127.1+311.7)*43758.5453;return s-Math.floor(s)};
-const SIZES={S:{g:200,cm:25},M:{g:250,cm:30},L:{g:400,cm:35}};
-const SAUCES={tomato:{n:'Томатний соус',g:60,c:'#c8321e'},cream:{n:'Вершковий соус',g:40,c:'#f3e6c4'},bbq:{n:'Соус BBQ',g:60,c:'#6b2a14'}};
-const ING=[
- {id:'pep',n:'Пепероні',cat:'meat',pp:4,ts:.85},
- {id:'sal',n:'Салями',cat:'meat',pp:4,ts:.85},
- {id:'shy',n:'Шинка',cat:'meat',pp:3,ts:.7},{id:'bac',n:'Бекон слайсами',cat:'meat',pp:4,ts:.62},{id:'bal',n:'Балик слайсами',cat:'meat',pp:3,ts:.64},{id:'hun',n:'Мисливські ковбаски',cat:'meat',pp:4,ts:.7},{id:'chk',n:'Копчене куряче філе кубиком',cat:'meat',pp:8,ts:1.3},
- {id:'chi',n:'Перець чілі',cat:'veg',pp:14,ts:1.1},{id:'cor',n:'Кукурудза',cat:'veg',pp:28,ts:1.7},{id:'oni',n:'Маринована цибуля',cat:'veg',pp:6,ts:1.1},{id:'pin',n:'Ананас',cat:'veg',pp:5,ts:1.1},{id:'cuc',n:'Мариновані огірки',cat:'veg',pp:6,ts:.85},
- {id:'tom',n:'Помідор',cat:'veg',pp:10,ts:1.1},{id:'bel',n:'Болгарський перець',cat:'veg',pp:10,ts:1.1},{id:'oli',n:'Оливки',cat:'veg',pp:20,max:80,ts:1.2},{id:'mas',n:'Маслини',cat:'veg',pp:20,max:80,ts:1.2},{id:'mus',n:'Гриби печериці',cat:'veg',pp:37.4,max:300,ts:.7},
- {id:'moz',n:'Моцарела (кубиком)',cat:'che',pp:43.2,max:360,ts:2.1},{id:'ched',n:'Чеддер (пластинками)',cat:'che',pp:.8,ts:.28},
- {id:'blu',n:'Сир з блакитною пліснявою',cat:'che',pp:8,ts:1.2},{id:'mix',n:'Мікс сирів',cat:'che',pp:60,max:480,ts:1.5}];
-const POST=[{id:'aru',n:'Рукола',g:8,pp:14,ts:1.2},{id:'gon',n:'Зелена цибуля',g:6,pp:34,ts:2.1},{id:'spi',n:'Італійські спеції',g:2,pp:44,ts:3},{id:'ice',n:'Айсберг',g:10,pp:12,ts:1.2}];   /* greens & spices (category 1) */
-const TOPS=[{id:'ter',n:'Теріякі',g:15,c:'#4a2410',c2:'#a2602c'},{id:'sch',n:'Світ чилі',g:15,c:'#d9381e',c2:'#ff8a5e'},{id:'cez',n:'Цезаріо',g:15,c:'#efe1bd',c2:'#fffaea'},{id:'bur',n:'Соус Бургер',g:40,c:'#c4683a',c2:'#efa76c'}];   /* topping sauces (category 2) */
-const CATS=[['meat',"М'ясо"],['che','Сири'],['veg','Овочі']];
+const SIZES=JSON.parse(JSON.stringify(PC.sizes));   /* S/M/L = 25/30/35 cm, K / C / W = non-standard formats (cm 101 / 102 / 103 are format ids, not centimetres) */
+const szT=cm=>cm>100?(Object.values(SIZES).find(z=>z.cm===cm)||{}).n||String(cm):cm+' см';
+const SAUCES=JSON.parse(JSON.stringify(PC.baseSauces));
+const ING=PC.byPhase('pre').map(i=>({id:i.id,n:i.n,cat:i.cat,pp:i.pp,ts:i.ts}));   /* every before-oven ingredient of the registry */
+const POST=PC.ingredients.filter(i=>i.cat==='gr').map(i=>({id:i.id,n:i.n,g:i.g,pp:i.pp,ts:i.ts}));   /* greens & spices (category 1) */
+const TOPS=PC.ingredients.filter(i=>i.cat==='sauce').map(i=>({id:i.id,n:i.n,g:i.g,c:i.c,c2:i.c2,conc:i.conc}));   /* topping sauces (category 2): start 40 g, +/- 5 g; conc:true = accent sauce (start 20 g, drawn like 15 g = 0.75x) */
+const SAUCE_G=t=>t.conc?20:40,SVK=id=>{const t=TOPS.find(x=>x.id===id);return t&&t.conc?.75:.5};   /* line density: standard 40 g drawn like 20 g (0.5x) */
+TOPS.forEach(t=>{t.g=SAUCE_G(t)});
+const CATS=PC.categories.filter(c=>c.phase==='pre').map(c=>[c.id,c.n]);
 const SH={
  sal:i=>'<circle r="13" fill="#b23a3a" stroke="#7c2323" stroke-width="1.5"/><circle cx="-5" cy="-4" r="1.8" fill="#f0c6bd"/><circle cx="5" cy="-5" r="1.6" fill="#f0c6bd"/><circle cx="4" cy="5" r="1.8" fill="#f0c6bd"/><circle cx="-4" cy="5" r="1.4" fill="#f0c6bd"/>',
- hun:i=>'<rect x="-15" y="-4.5" width="30" height="9" rx="4.5" fill="#7b3b2a" stroke="#54261a"/><rect x="-12" y="-2.5" width="18" height="2" rx="1" fill="#a45e46"/>',
+ hun:i=>{const h=k=>rnd(i*5.3+k*2.7+1),r=7.3+h(0)*.7,col=['#b84d3b','#a83e2d','#b04535'][i%3],nf=7+((h(1)*3)|0);let f='';   /* sliced hunting sausage: round disc, dark smoked casing, meat cut face, fat flecks (count / size / position vary with i) */
+ for(let q=0;q<nf;q++){const a=h(10+q)*6.283,d=Math.sqrt(h(20+q))*(r-2.3),x=(d*Math.cos(a)).toFixed(1),y=(d*Math.sin(a)).toFixed(1);f+=`<ellipse cx="${x}" cy="${y}" rx="${(.45+h(30+q)*.6).toFixed(2)}" ry="${(.35+h(40+q)*.4).toFixed(2)}" transform="rotate(${(h(50+q)*180)|0} ${x} ${y})" fill="${q%2?'#f5d5cc':'#e8c4b8'}" opacity=".9"/>`}
+ return `<circle r="${r.toFixed(2)}" fill="#6b2a1a" stroke="#4a1c12" stroke-width="1"/><circle r="${(r-1.4).toFixed(2)}" fill="${col}"/><circle r="${(r-2.2).toFixed(2)}" fill="none" stroke="#8c3524" stroke-width=".5" opacity=".55"/><ellipse cx="-2" cy="-2.3" rx="${(r*.42).toFixed(1)}" ry="${(r*.27).toFixed(1)}" fill="#c75e4a" opacity=".4"/>`+f},
  chk:i=>'<rect x="-5.5" y="-5.5" width="11" height="11" rx="2.5" fill="#dcae80" stroke="#a8724a"/><rect x="-3" y="-3" width="4" height="4" rx="1" fill="#efcca2"/>',
  chi:i=>{const h=k=>rnd(i*9.7+k*3.3+1),n=22,r0=5.3+h(0)*1.7,ph=h(1)*6.28,a1=.10+h(2)*.16,a2=.05+h(3)*.10,k1=2+((h(4)*2)|0),k2=3+((h(5)*3)|0),sx=.82+h(6)*.34,sy=.82+h(7)*.34;
   let d='';for(let j=0;j<=n;j++){const t=j/n*6.2832,w=1+a1*Math.sin(k1*t+ph)+a2*Math.sin(k2*t+ph*1.7)+(j%n?(h(20+j)-.5)*.07:0);d+=(j?'L':'M')+(r0*w*sx*Math.cos(t)).toFixed(2)+' '+(r0*w*sy*Math.sin(t)).toFixed(2)}
@@ -237,9 +459,11 @@ const SH={
   let seeds='';for(let q=0;q<ns;q++){const a=h(30+q)*6.28,rr=h(40+q)*r0*.45;seeds+=`<ellipse cx="${(rr*Math.cos(a)).toFixed(1)}" cy="${(rr*Math.sin(a)).toFixed(1)}" rx="1.1" ry=".75" transform="rotate(${(h(50+q)*180).toFixed(0)} ${(rr*Math.cos(a)).toFixed(1)} ${(rr*Math.sin(a)).toFixed(1)})" fill="#f3e7a0"/>`}
   return `<path d="${d}Z" fill="none" stroke="${col}" stroke-width="${(2.1+h(8)*1).toFixed(1)}" stroke-linejoin="round"/><path d="${d}Z" transform="scale(.7)" fill="none" stroke="#f1b9a2" stroke-width=".7" stroke-opacity=".75"/>`+seeds},
  cor:i=>`<ellipse rx="3.4" ry="4" fill="${i%2?'#f6c928':'#efb81c'}"/>`,
- oni:i=>'<path d="M-9 3Q0-10 9 3" fill="none" stroke="#b86bb0" stroke-width="2.6" stroke-linecap="round"/><path d="M-6 3Q0-5 6 3" fill="none" stroke="#e8b9df" stroke-width="1"/>',
- pin:i=>'<path d="M-8 5L-6-5Q0-9 6-5L8 5Q0 8-8 5Z" fill="#f7d94a" stroke="#e0b61f"/>',
- cuc:i=>'<circle r="8.5" fill="#7fb04a" stroke="#4f7d2a"/><circle r="5.5" fill="#c9e08e"/><circle cx="-2" cy="-1" r=".9" fill="#f0f5cf"/><circle cx="2" cy="1" r=".9" fill="#f0f5cf"/>',
+ oni:i=>{const h=k=>rnd(i*6.1+k*2.3+1),L=7+h(0)*3,b1=(h(1)-.5)*6,b2=(h(2)-.5)*6,t=(h(3)-.5)*3,c=['#f7f7f2','#f1f0e6','#e8e6d8'][i%3];   /* pickled onion: pale, soft, limp wavy strand (organic bezier, varies with i) */
+ return `<path d="M${-L} ${(2+t).toFixed(1)}Q${(-L/2).toFixed(1)} ${(-3+b1).toFixed(1)} 0 ${(1+b2/2).toFixed(1)}T${L} ${(-1+t).toFixed(1)}" fill="none" stroke="#d0cebe" stroke-width="3.6" stroke-linecap="round" opacity=".55"/><path d="M${-L} ${(2+t).toFixed(1)}Q${(-L/2).toFixed(1)} ${(-3+b1).toFixed(1)} 0 ${(1+b2/2).toFixed(1)}T${L} ${(-1+t).toFixed(1)}" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" opacity=".92"/><path d="M${(-L*.7).toFixed(1)} ${(1.6+t).toFixed(1)}Q${(-L/3).toFixed(1)} ${(-2.6+b1).toFixed(1)} ${(L*.1).toFixed(1)} ${(.6+b2/2).toFixed(1)}" fill="none" stroke="#fff" stroke-width=".7" stroke-opacity=".7" stroke-linecap="round"/>`},
+ pin:i=>'<path d="M-4.8 3L-3.6-3Q0-5.4 3.6-3L4.8 3Q0 4.8-4.8 3Z" fill="#f7d94a" stroke="#e0b61f" stroke-width=".8"/>',   /* ~60% of the old size */
+ cuc:i=>{const sk=['#4b582a','#3d4922','#44512a'][i%3],fl=['#8a9a5b','#9cad6a','#93a362'][i%3];   /* pickled / canned: dull olive skin, murky translucent flesh, darker olive core */
+ return `<circle r="8.5" fill="${sk}" stroke="#343e1c" stroke-width=".8"/><circle r="7" fill="${fl}"/><circle r="4.4" fill="#76854b" opacity=".85"/><circle cx="-1.8" cy="-.8" r=".8" fill="#a8b57c"/><circle cx="1.8" cy="1" r=".8" fill="#a8b57c"/><circle cx=".2" cy="-2.2" r=".7" fill="#a8b57c"/>`},
  blu:i=>'<path d="M-6-3L-2-7L5-5L7 1L2 6L-5 4Z" fill="#f1f0e6" stroke="#cfd3d6"/><circle cx="-2" cy="-1" r="1.3" fill="#5b7fa6"/><circle cx="2" cy="2" r="1.3" fill="#5b7fa6"/>',
  mix:i=>{const h=k=>rnd(i*7.7+k*2.9+1),L=5+h(0)*2.6,w=1.5+h(1)*1.1,cv=(h(2)-.5)*5.5,dy=(h(3)-.5)*3.2,col=['#f1c75a','#fffaf0','#f6e3a1','#f4d27a'][i%4];   /* grated-cheese flake: thick, slightly curved, irregular, tapering */
   return `<path d="M${-L} ${(-dy).toFixed(1)}Q${((h(4)-.5)*3).toFixed(1)} ${cv.toFixed(1)} ${L} ${dy.toFixed(1)}" fill="none" stroke="${col}" stroke-width="${(w*2).toFixed(1)}" stroke-linecap="round"/><path d="M${(-L*.7).toFixed(1)} ${(-dy*.7-.3).toFixed(1)}Q0 ${(cv*.8-.5).toFixed(1)} ${(L*.7).toFixed(1)} ${(dy*.7-.3).toFixed(1)}" fill="none" stroke="#fffdf4" stroke-width=".5" stroke-opacity=".55" stroke-linecap="round"/>`},
@@ -255,13 +479,19 @@ SH.moz=i=>'<rect x="-3" y="-3" width="6" height="6" rx="1.2" fill="#f7f2e4" stro
 const CHED_CM=6;   /* side of one cheddar slice, cm (was 4) - the 1 cm gap in chedLayout stays the same */
 SH.ched=i=>{const h=CHED_CM*U/2,c=['#f0a62a','#f3ad34','#ec9f22'][i%3];return `<rect x="${-h}" y="${-h}" width="${2*h}" height="${2*h}" rx="1.8" fill="${c}" stroke="#c97f12" stroke-width="1"/><rect x="${-h+2.2}" y="${-h+2.2}" width="${2*h-4.4}" height="${2*h-4.4}" rx="1.2" fill="none" stroke="#f9cd6c" stroke-width=".8" opacity=".7"/><path d="M${-h+4} ${-h+6}L${-h+12} ${-h+4}" stroke="#fbdc92" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>`};
 SH.tom=i=>{const c=['#d9402d','#cf3526','#e24c36'][i%3];return `<rect x="-4.6" y="-4.6" width="9.2" height="9.2" rx="1.8" fill="${c}" stroke="#9c2315" stroke-width=".8"/><rect x="-3" y="-3" width="4.2" height="3.4" rx="1" fill="#ee7a63" opacity=".75"/>`+(i%2?'<ellipse cx="1.6" cy="1.5" rx=".95" ry=".6" fill="#f6e3a0"/>':'<ellipse cx="-1.2" cy="2" rx=".9" ry=".6" fill="#f6e3a0"/>')};
-SH.bel=i=>{const P=[['#d3281d','#9b1a12','#ee6a58'],['#4a9a2a','#2f6e18','#86cc62'],['#f2c21a','#c99a0b','#fbe77a']][i%3];return `<rect x="-4.6" y="-4.6" width="9.2" height="9.2" rx="1.8" fill="${P[0]}" stroke="${P[1]}" stroke-width=".8"/><rect x="-3.1" y="-3.1" width="4.6" height="3" rx="1" fill="${P[2]}" opacity=".7"/>`};
+SH.bel=i=>{const q=S.panType==='cupcakes'?(Math.floor((i%1000)/6)+i%6)%3:i%3,P=[['#d3281d','#9b1a12','#ee6a58'],['#4a9a2a','#2f6e18','#86cc62'],['#f2c21a','#c99a0b','#fbe77a']][q];return `<rect x="-4.6" y="-4.6" width="9.2" height="9.2" rx="1.8" fill="${P[0]}" stroke="${P[1]}" stroke-width=".8"/><rect x="-3.1" y="-3.1" width="4.6" height="3" rx="1" fill="${P[2]}" opacity=".7"/>`};
 SH.oli=i=>`<circle r="4.7" fill="none" stroke="${['#8c9a3c','#7f8f34','#98a645'][i%3]}" stroke-width="2.4"/><circle r="4.7" transform="scale(.8)" fill="none" stroke="#cdd884" stroke-width=".7" stroke-opacity=".8"/>`;
 SH.mas=i=>`<circle r="4.7" fill="none" stroke="${['#26252b','#2d2b33','#201f25'][i%3]}" stroke-width="2.5"/><circle r="4.7" transform="scale(.8)" fill="none" stroke="#6a6874" stroke-width=".6" stroke-opacity=".8"/>`;
 SH.mus=i=>`<path d="M-8 1Q-8-8 0-8Q8-8 8 1Q4 2.5 2.6 2.5V7Q2.6 8.6 0 8.6Q-2.6 8.6-2.6 7V2.5Q-4 2.5-8 1Z" fill="${['#e9dcc9','#e4d4be','#eee2d1'][i%3]}" stroke="#b8a082" stroke-width=".9" stroke-linejoin="round"/><path d="M-5.6-.6Q-5.6-5.4 0-5.4Q5.6-5.4 5.6-.6Q2 .6 0 .6Q-2 .6-5.6-.6Z" fill="#f7efe3"/><path d="M-6 1.6Q-3 2.2-2.6 2.4M6 1.6Q3 2.2 2.6 2.4" stroke="#b8a082" stroke-width=".6" fill="none"/>`;
-const S={size:'M',sauce:null,qty:{},post:{},phase:'sauce',cat:'meat',sel:null,errors:[],knife:null,busy:0,hist:[],baked:false,pcat:'gr',drizzles:[],pendingTop:null,pw:{},psel:null};
+const S={size:'M',sauce:null,hasCheeseRim:false,cheeseRimG:0,ns:false,panType:null,packed:false,qty:{},post:{},phase:'rim',cat:'meat',sel:null,errors:[],knife:null,busy:0,hist:[],stack:[],baked:false,pcat:'gr',drizzles:[],pendingTop:null,pw:{},psel:null};
 /* standard starting portions (grams): meat 30, vegetables 30, cheeses 50, blue cheese 20; +/- change it by 10 g */
-const def=it=>it.id==='blu'?20:(it.id==='oli'||it.id==='mas')?10:it.cat==='che'?50:30;
+const DEF_G=PC.startRules.DEF_G,   /* first click = this many grams */
+ VIS_G={pep:120,hun:90,shy:40,bac:50,bal:90,chk:60,blu:30,chi:10,oni:50,pin:50},                      /* ...but it is drawn with the piece count of this weight */
+ VK=id=>(VIS_G[id]&&DEF_G[id])?VIS_G[id]/DEF_G[id]:1,                                         /* hun 3.0x, shy 1.33x, bac 1.67x, bal 1.8x, chk 2.0x, chi 2.0x, oni 1.67x, pin 1.67x */
+ FINE=new Set(PC.startRules.FINE),                                   /* micro-dosed: never shifted by crust size */
+ SIZE_D=PC.startRules.SIZE_D,                                          /* 25 cm crust (200 g): -10 g, 30 cm: as configured, 35 cm crust (400 g): +20 g */
+ STEP_G=it=>it.id==='ched'?12.5:it.cat==='meat'||(S.panType==='sandwich'&&it.id==='chi')?5:10,                                     /* +/- step before the oven: meats 5 g */
+ def=it=>startW(it.id,PC.startDefault(SIZES[S.size].cm,it.id));   /* start weight of the first click: dashboard override, else the registry rule (by crust size / format) */
 const hasMeat=()=>ING.some(i=>i.cat==='meat'&&S.qty[i.id]>0),hasCheese=()=>ING.some(i=>i.cat==='che'&&S.qty[i.id]>0);
 /* baking drives off 7% of the weight (moisture loss, "uzharka"); toppings added after baking are weighed on top of that */
 /* ---- Tech cards, grams. total = FINAL weight incl. post-bake herbs; sauce / herbs / total are reserved keys, every other key = ingredient id from ING ---- */
@@ -283,7 +513,7 @@ function patCheck(){const tk=tkMade();if(!tk?.pat)return[];
  return Object.entries(tk.pat).map(([id,need])=>{const ds=S.drizzles.filter(d=>d.id===id);return{id,need,n:TOPS.find(t=>t.id===id).n,got:[...new Set(ds.map(d=>PAT_N[d.pat]||d.pat))],ok:ds.length>0&&ds.every(d=>d.pat===need)}})}
 const patErrs=()=>patCheck().filter(r=>!r.ok).map(r=>r.got.length?`Неправильний стиль соусу «${r.n}»: нанесено ${r.got.join(', ')}, потрібна ${PAT_N[r.need]}`:`Соус «${r.n}» не нанесено (потрібна ${PAT_N[r.need]})`);
 /* ---- post-bake weight fine-tuning (herbs / greens: S.pw override, topping sauces: weight of the last drizzle) ---- */
-const PW_STEP={spi:1,aru:2,gon:2,ice:2},PW_TOP=5;
+const PW_STEP={spi:1,gon:1},PW_TOP=5;   /* herbs / green onion 1 g, other greens 5 g, topping sauces 5 g */
 function pwChips(){
  const it=[...POST.filter(p=>S.post[p.id]).map(p=>({id:p.id,n:p.n,g:postG(p)})),...TOPS.filter(t=>S.drizzles.some(d=>d.id===t.id)).map(t=>({id:t.id,n:t.n,g:S.drizzles.filter(d=>d.id===t.id).reduce((a,d)=>a+d.g,0)}))];
  return it.length?it.map(i=>`<div class="pwc"><span>${i.n}</span><button class="stp sm" data-pw="${i.id}" data-d="-1" aria-label="Менше">−</button><b>${i.g} г</b><button class="stp sm" data-pw="${i.id}" data-d="1" aria-label="Більше">+</button></div>`).join(''):'<span class="text-xs text-slate-400">Додайте зелень або соус, щоб налаштувати вагу</span>'}
@@ -294,11 +524,15 @@ function selPost(id,t){   /* same feel as the pre-oven list: tap = add + select,
  delete S.pw[id];S.psel=S.post[id]?null:id;
  togglePost(id,t.querySelector('svg'));
 }
-const PPG={spi:120};   /* particles per gram of post-bake item (default: pp/g). Italian herbs: 120 per gram -> a 1 g standard already looks rich */
+const PPG={spi:240};   /* particles per gram of post-bake item (default: pp/g). Italian herbs: 240 per gram (2x density, same flake size), identical for every base format */
 function adjPost(id,dir){
  const p=POST.find(x=>x.id===id);
- if(p){if(!S.post[id])return;const st=PW_STEP[id]||2;S.pw[id]=Math.max(1,Math.min(100,postG(p)+dir*st));sync([id],null,'pop')}   /* particle count follows the weight, live */
- else{const L=S.drizzles.filter(d=>d.id===id).pop();if(!L)return;L.g=Math.max(PW_TOP,Math.min(150,L.g+dir*PW_TOP));L.redraw&&L.redraw(Math.max(.35,Math.min(2.4,L.g/L.g0)))}   /* sauce line thickness follows the weight, live */
+ if(p){if(!S.post[id])return;const st=PW_STEP[id]||5,n=postG(p)+dir*st;
+  if(n<=0){S.post[id]=false;delete S.pw[id];if(S.psel===id)S.psel=null;sync([id],null,'pop')}   /* 0 g = item fully removed from state and canvas */
+  else{S.pw[id]=Math.min(100,n);sync([id],null,'pop')}}   /* particle count follows the weight, live */
+ else{const L=S.drizzles.filter(d=>d.id===id).pop();if(!L)return;const n=L.g+dir*PW_TOP;
+  if(n<=0){const k=S.drizzles.lastIndexOf(L);S.drizzles.splice(k,1);L.el.style.transition='opacity .25s';L.el.style.opacity=0;setTimeout(()=>L.el.remove(),260);if(!S.drizzles.some(d=>d.id===id)&&S.psel===id)S.psel=null}   /* last stroke gone -> sauce removed */
+  else{L.g=Math.min(150,n);L.redraw&&L.redraw(Math.max(.15,Math.min(2.4,SVK(id)*L.g/L.g0)))}}   /* sauce line thickness follows the weight, live */
  refresh();panel();
 }
 function layerSeq(){const s=[];[...$('#gIng').children].filter(l=>l.classList.contains('act')&&l._id&&[...l.children].some(c=>!c.classList.contains('gone'))).forEach(l=>{if(s[s.length-1]!==l._id)s.push(l._id)});return s}
@@ -309,24 +543,35 @@ const DEV_WARN=.1;   /* |deviation| <= 10% -> amber, above -> red, exact -> gree
    BAKED  = RAW * k          k = (TK final - TK post-bake) / RAW of the TK's own standard assembly  -> exact dynamic loss, no fixed %
                              (Margarita 25 cm: 340 g raw -> 314 g baked = 315 - 1)
    FINAL  = BAKED + post-bake herbs  (Margarita 25 cm: 314 + 1 = 315 g, 0 g deviation) */
+/* NON-STANDARD recipes: their own table, never mixed with TECH (round pizzas). Key = name -> format id (101 = К-Піца, 102 = Піца Капкейки). Values are placeholders until real tech cards arrive (dashboard JSON key TECH_NS). */
+const START_W={},startW=(id,d,cm)=>{const o=START_W[cm??SIZES[S.size].cm],v=o&&o[id];return v>0?v:d};   /* per-format start weights from the dashboard tab «Зміна стартової ваги» (key = cm 25/30/35 or format id 101/102/103); missing -> built-in defaults */
+const TECH_NS={   /* 101 = К-Піца, 102 = Піца Капкейки, 103 = Піца-сендвіч. Each format has its OWN short menu (recipesByFormat below) - nothing is cloned from the round-pizza catalog */
+ 'Маргарита':{101:{total:303,sauce:60,moz:100,tom:40,post:{spi:1}},103:{total:361,sauce:60,moz:100,tom:40,post:{spi:1}}},
+ 'Пепероні':{101:{total:322,sauce:60,pep:60,moz:100,post:{spi:1}},102:{total:230,sauce:36,pep:30,moz:60,post:{spi:1}},103:{total:379,sauce:60,pep:60,moz:100,post:{spi:1}}},   /* 102: tomato sauce (spoon dollops) + mozzarella + pepperoni slices */
+ 'Мисливська':{101:{total:331,sauce:60,hun:70,moz:100,post:{spi:1}},103:{total:388,sauce:60,hun:70,moz:100,post:{spi:1}}}
+};
+const recipesByFormat={standard:()=>Object.keys(TECH),k_pizza:()=>Object.keys(TECH_NS).filter(n=>TECH_NS[n][101]),cupcakes:()=>Object.keys(TECH_NS).filter(n=>TECH_NS[n][102]),sandwich:()=>Object.keys(TECH_NS).filter(n=>TECH_NS[n][103])};
+
+const TB=()=>S.ns?TECH_NS:TECH;
 const curOrder=()=>{try{return ORDER}catch(e){return null}},
  recipeName=()=>curOrder()?.name||'Маргарита',
- tkFor=cm=>TECH[recipeName()]?.[cm],                       /* TK of a given size */
+ tkFor=cm=>TB()[recipeName()]?.[cm],                       /* TK of a given size */
  ordCm=()=>curOrder()?.size??SIZES[S.size].cm,              /* ORDERED size (outside an order: the size taken) */
  tkMade=()=>tkFor(ordCm()),                                 /* reference TK = the ORDER (recipe + size), never the dough the player happened to take */
  doughOf=cm=>Object.values(SIZES).find(z=>z.cm===cm).g,
  tkPost=tk=>tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),                                           /* post-bake items of a TK: {id:g} (legacy herbs -> Italian spices) */
- tkIngs=tk=>Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat'].includes(k)),
+ tkIngs=tk=>Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat','rim','hasCheeseRim'].includes(k)),
  tkBakedTarget=tk=>tk.total-Object.values(tkPost(tk)).reduce((a,b)=>a+b,0),                      /* Target Baked = Final TK - post-bake */
- tkRefRaw=(tk,cm)=>doughOf(cm)+tk.sauce+tkIngs(tk).reduce((a,k)=>a+tk[k],0);   /* raw weight of the standard assembly */
-const allK=()=>{const a=[];for(const r of Object.values(TECH))for(const cm in r)a.push(tkBakedTarget(r[cm])/tkRefRaw(r[cm],+cm));return a.reduce((x,y)=>x+y,0)/a.length},   /* only for a recipe that has no TK */
+ tkRim=tk=>!!(tk&&(tk.hasCheeseRim||tk.rim)),
+ tkRefRaw=(tk,cm)=>doughOf(cm)+(tkRim(tk)?RIMG(cm):0)+tk.sauce+tkIngs(tk).reduce((a,k)=>a+tk[k],0);   /* raw weight of the standard assembly */
+const allK=()=>{const a=[];for(const r of Object.values(TB()))for(const cm in r)a.push(tkBakedTarget(r[cm])/tkRefRaw(r[cm],+cm));return a.reduce((x,y)=>x+y,0)/a.length},   /* only for a recipe that has no TK */
  bakeK=()=>{const tk=tkMade(),k=tk?tkBakedTarget(tk)/tkRefRaw(tk,ordCm()):allK();return Number.isFinite(k)&&k>0?k:.92};   /* k comes from the ORDERED tech card but is applied to the weight that was REALLY assembled; no card at all -> 8% shrink */
 const SIZE_SAUCE_K={25:1,30:1,35:2},   /* auto-sauce follows the dough really taken: 60 / 60 / 120 g */
  sauceG=id=>{const tk=tkMade(),mk=SIZE_SAUCE_K[SIZES[S.size].cm]??1,ok=SIZE_SAUCE_K[ordCm()]??1;
   if(tk&&(tk.sauceId||'tomato')===id&&Number.isFinite(+tk.sauce))return Math.round(+tk.sauce*mk/ok);   /* the recipe's own sauce: TK grams, scaled by the size really taken */
   const w=Math.round(SAUCES[id].g*mk);return Number.isFinite(w)?w:SAUCES[id].g},   /* auto-sauce follows the TK: 60 / 60 / 120 g */
- postG=p=>{const tk=tkMade();return S.pw[p.id]??(tk&&tkPost(tk)[p.id])??p.g};                                                          /* herbs follow the TK: 1 / 1 / 2 g */
-const raw=()=>SIZES[S.size].g+(S.sauce?sauceG(S.sauce):0)+ING.reduce((a,i)=>a+(S.qty[i.id]||0),0),
+ postG=p=>{const tk=tkMade();return S.pw[p.id]??(tk&&tkPost(tk)[p.id])??startW(p.id,p.g)};                                                          /* herbs follow the TK: 1 / 1 / 2 g */
+const raw=()=>SIZES[S.size].g+rimNow()+(S.sauce?sauceG(S.sauce):0)+ING.reduce((a,i)=>a+(S.qty[i.id]||0),0),
  baked=()=>Math.round(raw()*bakeK()),
  post=()=>POST.reduce((a,p)=>a+(S.post[p.id]?postG(p):0),0)+S.drizzles.reduce((a,d)=>a+d.g,0),
  pre=raw,total=()=>(S.baked?baked():raw())+post();
@@ -334,31 +579,48 @@ function mk(tag,at,p){const e=document.createElementNS(NS,tag);for(const k in at
 function toast(m,bad){const h=$('#hint');h.textContent=m;h.className='show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>h.className='',2600)}
 let wv=250,wr;
 function setW(t,dur){cancelAnimationFrame(wr);const f=wv,t0=performance.now(),d=dur||Math.min(700,200+Math.abs(t-f)*2);const st=n=>{const k=Math.min(1,(n-t0)/d),e=1-(1-k)**3;wv=Math.round(f+(t-f)*e);$('#wn').textContent=wv;if(k<1)wr=requestAnimationFrame(st)};wr=requestAnimationFrame(st)}
-function refresh(){syncUndo();
- setW(total());const z=SIZES[S.size],can=S.phase==='sauce'||S.phase==='build';
- ['#crust','#dough','#bakeR','#gSauce','#melt'].forEach(q=>$(q).style.transform=`scale(${z.cm/35})`);$('#stage').style.setProperty('--k',z.cm/35);$('#sub').textContent=`Піца ${z.cm} см`+(S.baked?` · ужарка −${raw()-baked()} г`:'');
- $('#sizes').innerHTML=Object.entries(SIZES).map(([k,v])=>`<button class="sz ${S.size===k?'on':''}" data-size="${k}" ${can?'':'disabled'}><b>${k}</b><small>${v.g} г</small></button>`).join('');
+function fmtArt(k){   /* pan illustrations for the format cards */
+ if(k==='W')return `<svg viewBox="0 0 200 130" aria-hidden="true"><rect width="200" height="130" fill="#0f172a"/><ellipse cx="100" cy="116" rx="70" ry="7" fill="#000" opacity=".4"/><path d="M42 62A58 58 0 0 1 158 62Z" fill="#efd9a6" stroke="#d3b374" stroke-width="2" opacity=".55" stroke-dasharray="4 3"/><path d="M42 64A58 58 0 0 0 158 64Z" fill="#efd9a6" stroke="#d3b374" stroke-width="2"/><path d="M55 70H145A47 47 0 0 1 55 70Z" fill="#cf3526" opacity=".85"/><circle cx="80" cy="82" r="7" fill="#b3261b"/><circle cx="104" cy="88" r="7" fill="#b3261b"/><circle cx="122" cy="79" r="6" fill="#b3261b"/><path d="M62 56Q100 24 138 56" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round" marker-end="none"/><path d="M134 49L139 57L129 58Z" fill="#f59e0b"/></svg>`;
+ const def='<defs><linearGradient id="fpM'+k+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfd5dd"/><stop offset=".5" stop-color="#8d97a5"/><stop offset="1" stop-color="#5b6470"/></linearGradient><radialGradient id="fpB'+k+'" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#4b4e55"/><stop offset="1" stop-color="#23252a"/></radialGradient></defs>';
+ if(k==='K')return `<svg viewBox="0 0 200 130" aria-hidden="true">${def}<rect width="200" height="130" fill="#0f172a"/><ellipse cx="100" cy="112" rx="82" ry="8" fill="#000" opacity=".4"/><rect x="22" y="30" width="156" height="78" rx="12" fill="url(#fpM${k})" stroke="#e5e9ef" stroke-width="1.5"/><rect x="31" y="39" width="138" height="60" rx="7" fill="url(#fpB${k})" stroke="#2c2e33" stroke-width="1.5"/><rect x="31" y="39" width="138" height="9" rx="4" fill="#000" opacity=".25"/><path d="M26 36Q100 25 174 36" stroke="#fff" stroke-width="1.6" fill="none" opacity=".6"/><rect x="8" y="58" width="16" height="9" rx="4" fill="#9aa4b1"/><rect x="176" y="58" width="16" height="9" rx="4" fill="#9aa4b1"/></svg>`;
+ return `<svg viewBox="0 0 200 130" aria-hidden="true">${def}<rect width="200" height="130" fill="#0f172a"/><ellipse cx="100" cy="116" rx="86" ry="7" fill="#000" opacity=".4"/><rect x="10" y="18" width="180" height="96" rx="30" fill="url(#fpM${k})" stroke="#e5e9ef" stroke-width="1.5"/>${[[48,46],[100,46],[152,46],[48,86],[100,86],[152,86]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="21" fill="#c9ced6"/><circle cx="${x}" cy="${y}" r="17" fill="url(#fpB${k})" stroke="#2c2e33" stroke-width="1.2"/><path d="M${x-14} ${y-5}A15 15 0 0 1 ${x-4} ${y-14}" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".35"/>`).join('')}<path d="M24 24Q100 14 176 24" stroke="#fff" stroke-width="1.6" fill="none" opacity=".55"/></svg>`;
+}
+function buildFmt(){const h=$('#fmtPick');if(!h||h.dataset.b)return;h.dataset.b=1;
+ h.innerHTML=['K','C','W'].map(k=>{const z=SIZES[k],nm=z.n,w=k==='C'?z.g+' г (6 шт)':z.g+' г',bt=k==='K'?'Обрати К-Піцу':k==='W'?'Обрати Сендвіч':'Обрати Капкейки';
+  return `<div class="fmtCard" role="button" tabindex="0" data-fmt="${k}" aria-label="${nm}">${fmtArt(k)}<b>${nm}</b><span class="fw">${w}</span><button type="button" class="fb" tabindex="-1">${bt}</button></div>`}).join('');
+ const pick=c=>{if(S.busy||!(S.ns&&!S.panType&&S.phase==='rim'))return;const cs=[...h.children],o=cs.filter(x=>x!==c),hr=h.getBoundingClientRect(),cr=c.getBoundingClientRect();
+  c.style.setProperty('--dx',(hr.left+hr.width/2-(cr.left+cr.width/2))+'px');c.classList.add('sel');o.forEach(x=>x.classList.add('out'));startPan(c.dataset.fmt)};
+ h.addEventListener('click',e=>{const c=e.target.closest('.fmtCard');if(c)pick(c)});
+ h.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const c=e.target.closest('.fmtCard');if(c){e.preventDefault();pick(c)}}});
+}
+function fmtSync(){buildFmt();const h=$('#fmtPick'),on=!!(S.ns&&!S.panType&&S.phase==='rim'&&!S.busy);h.classList.toggle('show',on);if(on)[...h.children].forEach(c=>c.classList.remove('sel','out'))}
+function refresh(){syncUndo();fmtSync();
+ S.cheeseRimG=rimNow();$('#sFill').setAttribute('r',131-rimD());setW(total());const z=SIZES[S.size],can=S.phase==='rim'||S.phase==='sauce'||(!S.ns&&S.phase==='build');$('#stage').classList.toggle('ns',!!S.ns);
+ ['#crust','#dough','#bakeR','#gSauce','#melt','#gRim'].forEach(q=>$(q).style.transform=`scale(${z.cm/35})`);$('#stage').style.setProperty('--k',(z.gm||z.cm)/35);$('#stage').classList.toggle('swz',S.panType==='sandwich');$('#sub').textContent=(S.ns?z.n:`Піца ${z.cm} см`)+(S.baked?` · ужарка −${raw()-baked()} г`:'');
+ $('#sizes').innerHTML=Object.entries(SIZES).filter(([k,v])=>!!v.ns===!!S.ns).map(([k,v])=>`<button class="sz ${v.ns?'ns':''} ${S.size===k&&(!S.ns||S.panType)?'on':''}" data-size="${k}" ${can?'':'disabled'}>${v.ns?PANICO[k]:''}<b>${v.ns?v.n:k}</b><small>${v.g} г</small></button>`).join('');
 }
 /* ---- undo: steps back through the action history (sauce -> ingredient adds / +/- steps -> post-bake toppings) ---- */
 const syncUndo=()=>{const u=$('#undo');if(u)u.disabled=!(S.hist.length&&!S.busy&&(S.phase==='build'||S.phase==='post'))};
 function undo(){
  if(S.busy||!S.hist.length||!(S.phase==='build'||S.phase==='post'))return;
- const h=S.hist.pop();
- if(h.t==='ing'){if(h.before)S.qty[h.id]=h.before;else delete S.qty[h.id];S.sel=h.id;sync([h.id],null,'pop')}
+ const h=S.hist.pop();flushSync();
+ if(h.t==='ing'){S.stack=h.stack||S.stack;if(h.before)S.qty[h.id]=h.before;else delete S.qty[h.id];S.sel=h.id;sync([h.id],null,'pop')}
  else if(h.t==='drip'){const d=S.drizzles.pop();if(d){d.el.style.transition='opacity .35s';d.el.style.opacity=0;setTimeout(()=>d.el.remove(),380)}}
  else if(h.t==='post'){S.post[h.id]=h.before;sync([h.id],null,'pop')}
- else if(h.t==='sauce'){S.sauce=null;$('#sFill').style.opacity=0;$('#sPath').setAttribute('d','M0 0');S.phase='sauce'}
+ else if(h.t==='sauce'){if(S.panType==='sandwich'){const q=$('#swSauce');q.style.opacity=0;$('#swSF').style.opacity=0}if(S.ns){const q=$('#nsSauce');q.style.opacity=0;q.style.transition='none';resetSauceNS()}S.sauce=null;$('#sFill').style.opacity=0;$('#sPath').setAttribute('d','M0 0');S.phase='sauce'}
  refresh();panel();
 }
 document.addEventListener('DOMContentLoaded',()=>$('#undo').addEventListener('click',undo));
 /* ---- placement engine: every ingredient type is its own independent layer ---- */
-const EX={sal:14,hun:16,chk:8,chi:8,cor:5,oni:10,pin:10,cuc:10,blu:8,mix:7,ice:10,spi:3,aru:8,gon:4,pep:12,shy:14,bac:17,bal:16,moz:4,ched:25.8,tom:5.5,bel:5.5,oli:5.8,mas:5.8,mus:9.5};   /* half-extent of a piece (fixed real-world size; 8.571 units = 1 cm) */
-const FP={sal:28,hun:34,chk:18,chi:15,oni:22,pin:19,cuc:20,blu:17,ice:22,aru:18,pep:24,shy:30,bac:36,bal:34,moz:8.5,ched:56,tom:12,bel:12,oli:12,mas:12,mus:20};
-const RAD=new Set(['bac','bal','hun']),PH={bal:.25,hun:.5};RAD.forEach(id=>{FP[id]=FP.pep});   /* fixed per-id angular phase (fraction of one slot step): same grams -> pieces alternate between each other, never stack */   /* bacon / balyk / hunting sausages use pepperoni's exact slots() spacing params; posFor() default path = same function, per-layer rotation by ALL.indexOf(id) keeps layers independent */
+const EX={sal:14,hun:8,chk:8,chi:8,cor:5,oni:10,pin:6,cuc:10,blu:8,mix:7,ice:10,spi:3,aru:8,gon:4,pep:12,shy:14,bac:17,bal:16,moz:4,ched:25.8,tom:5.5,bel:5.5,oli:5.8,mas:5.8,mus:9.5};   /* half-extent of a piece (fixed real-world size; 8.571 units = 1 cm) */
+const FP={sal:28,hun:16,chk:18,chi:15,oni:22,pin:12,cuc:20,blu:17,ice:22,aru:18,pep:24,shy:30,bac:36,bal:34,moz:8.5,ched:56,tom:12,bel:12,oli:12,mas:12,mus:20};
+const RAD=new Set(['bac','bal']),PH={bal:.25};RAD.forEach(id=>{FP[id]=FP.pep});   /* fixed per-id angular phase (fraction of one slot step): same grams -> pieces alternate between each other, never stack */   /* bacon / balyk / hunting sausages use pepperoni's exact slots() spacing params; posFor() default path = same function, per-layer rotation by ALL.indexOf(id) keeps layers independent */
 const BULK=new Set(['cor','mix','spi','gon','aru']),U=8.571,ALL=[...ING,...POST].map(i=>i.id);
 /* sauce disc radius (units) for the current base; a piece (centre + half extent) must stay strictly inside it, never touching the crust */
-const sauceR=()=>131*SIZES[S.size].cm/35,maxR=id=>sauceR()-EX[id]-(RAD.has(id)?2:5);
-const baseR=()=>SIZES[S.size].cm*U/2,cnt=it=>it.cat?Math.min(it.max||1e9,Math.round((S.qty[it.id]||0)*it.pp/10)):(S.post[it.id]?Math.max(1,Math.min(it.max||900,Math.round(postG(it)*(PPG[it.id]??it.pp/it.g)))):0);
+const RIMG=cm=>cm===35?100:70,rimNow=()=>S.hasCheeseRim?RIMG(SIZES[S.size].cm):0,rimD=()=>S.hasCheeseRim?6:0,sauceR=()=>S.ns?100:(131-rimD())*SIZES[S.size].cm/35,maxR=id=>sauceR()-EX[id]-(RAD.has(id)?2:5);
+const fg=v=>String(+(+v).toFixed(1)),MAXG=it=>it.cat==='che'?160:120,baseR=()=>SIZES[S.size].cm*U/2,nsF=it=>S.ns?(S.panType==='sandwich'?(it.id==='pin'?1.5:1):S.panType==='cupcakes'?(it.cat==='meat'?3:it.cat==='veg'?1.5:1.2):.5):1,nsMin=g=>S.ns&&g>0?(S.panType==='cupcakes'?6:1):0,kCount=(it,g)=>{if(g<=0)return 0;const id=it.id;let n;   /* К-Піца piece counts per portion (scaled by weight) */
+  if(id==='ched')n=Math.round(g/12.5);else if(id==='chi')n=Math.round(8*g/5);else if(['pep','sal','shy','bac','bal'].includes(id))n=Math.round(8*g/20);else if(['cuc','oli','mas'].includes(id))n=Math.round(10*g/20);
+  else n=Math.round(g*it.pp/10*VK(id)*.5)*({moz:2,mix:2,tom:2,bel:2,oni:2,pin:3}[id]||1);return Math.max(1,n)},SLICED=new Set(['pep','sal','shy','bac','bal','ched']),FIVE=new Set(['hun','chk']),KEEP=new Set(['chi','cuc','oli']),cupN=(it,g)=>g>0?6*(SLICED.has(it.id)?Math.max(1,Math.ceil(g/30)):FIVE.has(it.id)?5:it.id==='blu'?3:it.cat==='che'?(g>=40?20:18):it.cat==='veg'&&!KEEP.has(it.id)?(g>=40?6:5):(g>=40?4:3)):0,cntG=(it,g)=>S.panType==='cupcakes'?cupN(it,g):S.panType==='k_pizza'?kCount(it,g):(S.panType==='sandwich'&&swCnt(it,g))||Math.min(it.max||1e9,Math.max(nsMin(g),Math.round(g*it.pp/10*VK(it.id)*nsF(it)))),lays=id=>{const a=S.stack.filter(l=>l.id===id&&l.g>0);return a.length?a:((S.qty[id]||0)>0?[{id,g:S.qty[id]}]:[])},cnt=it=>it.cat&&S.panType==='cupcakes'?cupN(it,S.qty[it.id]||0):it.cat&&S.panType==='k_pizza'?kCount(it,S.qty[it.id]||0):it.cat&&S.panType==='sandwich'&&swCnt(it,S.qty[it.id]||0)?swCnt(it,S.qty[it.id]||0):it.cat?Math.min(it.max||1e9,Math.max(nsMin(S.qty[it.id]||0),Math.round((S.qty[it.id]||0)*it.pp/10*VK(it.id)*nsF(it)))):(S.post[it.id]?Math.max(1,Math.min(it.max||(it.id==='spi'?1800:900),Math.round(postG(it)*(PPG[it.id]??it.pp/it.g)))):0);
 const fib=(n,R,off)=>[...Array(n)].map((_,i)=>{const r=R*Math.sqrt((i+.5)/n),a=i*2.39996+off;return{x:160+r*Math.cos(a),y:160+r*Math.sin(a),r:rnd(i+off)*360}});
 function slots(N,Ru,fp,f=0,ph=0){
  if(N===1)return[{x:160,y:160,r:0}];
@@ -374,42 +636,48 @@ function slots(N,Ru,fp,f=0,ph=0){
    Sliced ingredients (salami, sausage, cucumber) keep their neat uniform orientation. Values are per piece index, so they never change after landing. */
 const LOOSE=new Set(['chk','pin','cor','oni','blu','chi','moz','tom','bel','oli','mas','mus']);
 /* cheddar: square slices CHED_CM x CHED_CM (50 g = 4 slices), 1 cm gap, no tilt.  1 = centre, 2 = side by side, 3 = triangle (1 on top, 2 at the bottom), 4 = 2x2 square around the centre, 5+ = centred rows */
-function chedLayout(n){
+function chedLayout(n,j=0){
  const s=CHED_CM*U,P=s+U,h=P/2,lim=sauceR()-s/2*Math.SQRT2-3;let c;
  if(n===1)c=[[0,0]];
  else if(n===2)c=[[-h,0],[h,0]];
  else if(n===3)c=[[0,-h],[-h,h],[h,h]];
  else if(n===4)c=[[-h,-h],[h,-h],[-h,h],[h,h]];
  else{const cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);c=[];for(let r=0;r<rows;r++){const m=r<rows-1?cols:n-cols*(rows-1);for(let k=0;k<m;k++)c.push([(k-(m-1)/2)*P,(r-(rows-1)/2)*P])}}
- return c.map(([x,y])=>{const d=Math.hypot(x,y);if(d>lim){x*=lim/d;y*=lim/d}return{x:160+x,y:160+y,r:0}});
+ return c.map(([x,y])=>{x+=j*h*(j%2?1:-1);y+=j*h*.6;const d=Math.hypot(x,y);if(d>lim){x*=lim/d;y*=lim/d}return{x:160+x,y:160+y,r:0}});
 }
 /* olives / black olives: 20 rings per 10 g on two concentric circles (inner ~35 %, outer ~65 %), clock order starting at 12 o'clock;
    black olives are rotated by half a step on each circle, so they sit between the green rings instead of on top of them */
-function oliveLayout(n,black){
+function oliveLayout(n,black,j=0){
  const R=maxR('oli'),r1=R*.5,r2=R*.98,n1=Math.max(1,Math.round(n*r1/(r1+r2))),pts=[];
- [[n1,r1],[n-n1,r2]].forEach(([m,r])=>{for(let k=0;k<m;k++){const a=-Math.PI/2+(k+(black?.5:0))*2*Math.PI/m;pts.push({x:160+r*Math.cos(a),y:160+r*Math.sin(a),r:0})}});
+ [[n1,r1],[n-n1,r2]].forEach(([m,r])=>{for(let k=0;k<m;k++){const a=-Math.PI/2+(k+(black?.5:0)+j*.37)*2*Math.PI/m;pts.push({x:160+r*Math.cos(a),y:160+r*Math.sin(a),r:0})}});
  return pts;
 }
 /* mushrooms: 30 g = 112 slices (~70 % coverage); even Fibonacci scatter + jitter + free rotation, so neighbouring slices overlap a little */
 function mushLayout(n,R,idx){
  return fib(n,R,idx*1.7+1).map((p,i)=>({x:p.x+(rnd(i*5+idx*3+1)-.5)*4,y:p.y+(rnd(i*5+idx*3+2)-.5)*4,r:rnd(i*7+idx*11+3)*360}));
 }
-function posFor(it){
- const n=cnt(it);if(!n)return[];if(it.id==='mus')return mushLayout(n,maxR('mus')+6,ALL.indexOf('mus'));if(it.id==='ched')return chedLayout(n);if(it.id==='oli'||it.id==='mas')return oliveLayout(n,it.id==='mas');const R=maxR(it.id),idx=ALL.indexOf(it.id);
+/* one layout PER LAYER: j = layer index of this ingredient (0 = first pass). Seeds / phases / rotation derive from j, so every pass scatters over the whole pizza on its own and never touches the pieces of other layers */
+const LAY_CACHE=new Map();
+function posForL(it,n,j){   /* memoised: a layer's slots depend only on (ingredient, count, layer index, pizza size, rim) -> lower layers never recompute */
+ const key=it.id+'|'+n+'|'+j+'|'+S.size+'|'+(S.hasCheeseRim?1:0)+'|'+(S.packed?1:0)+(S.panType==='sandwich'?'|m'+swMeatIdx(it):'');let v=LAY_CACHE.get(key);if(!v){v=S.ns?nsPos(it,n,j):posForL0(it,n,j);if(LAY_CACHE.size>800)LAY_CACHE.clear();LAY_CACHE.set(key,v)}return v}
+function posForL0(it,n,j){
+ if(!n)return[];const idj=ALL.indexOf(it.id)+j*5.3;
+ if(it.id==='mus')return mushLayout(n,maxR('mus')+6,idj);if(it.id==='ched')return chedLayout(n,j);if(it.id==='oli'||it.id==='mas')return oliveLayout(n,it.id==='mas',j);const R=maxR(it.id),idx=idj;
  let P;
- if(BULK.has(it.id))P=fib(n,R,idx*1.7+1);
- else{const th=RAD.has(it.id)?0:idx*2.39996,c=Math.cos(th),s=Math.sin(th);P=slots(n,R,FP[it.id],RAD.has(it.id)?(n<=8?1.5:0):(idx*.618)%1,PH[it.id]||0).map(p=>{const x=p.x-160,y=p.y-160;return{x:160+x*c-y*s,y:160+x*s+y*c,r:p.r+th*57.3}})}
- if(RAD.has(it.id))P=P.map((p,i)=>({x:p.x,y:p.y,r:Math.atan2(p.y-160,p.x-160)*180/Math.PI+(rnd(i*7+idx*11+3)-.5)*20}));   /* bacon: long axis (SVG x-axis) points along the radius, centre -> crust, +-10 deg natural tilt; positions untouched */
+ if(BULK.has(it.id)||(j>0&&n<=8&&!RAD.has(it.id)))P=fib(n,R,idx*1.7+1);
+ else{const th=RAD.has(it.id)?j*.9:idx*2.39996,c=Math.cos(th),s=Math.sin(th);P=slots(n,R,FP[it.id],RAD.has(it.id)?(n<=8?1.5:0):(idx*.618)%1,(PH[it.id]||0)+j*.37).map(p=>{const x=p.x-160,y=p.y-160;return{x:160+x*c-y*s,y:160+x*s+y*c,r:p.r+th*57.3}})}
+ if(RAD.has(it.id))P=P.map((p,i)=>({x:p.x,y:p.y,r:Math.atan2(p.y-160,p.x-160)*180/Math.PI+(rnd(i*7+idx*11+3)-.5)*20}));
  if(LOOSE.has(it.id))P=P.map((p,i)=>({x:p.x+(rnd(i*5+idx*3+1)-.5)*3.6,y:p.y+(rnd(i*5+idx*3+2)-.5)*3.6,r:(rnd(i*7+idx*11+3)-.5)*90}));
  return P;
 }
+function posFor(it){return it.cat?lays(it.id).flatMap((l,j)=>posForL(it,cntG(it,l.g),j)):posForL(it,cnt(it),0)}
 function grp(id,create){
  let g=$('#L_'+id);
  if(!g&&create){const post=POST.some(p=>p.id===id),it=ING.find(i=>i.id===id),par=post?$('#gPost'):({che:$('#gCheese'),veg:$('#gVeg'),meat:$('#gTop')})[it.cat];g=mk('g',{id:'L_'+id});BULK.has(id)&&!post?par.prepend(g):par.appendChild(g)}
  return g;
 }
 const marm=id=>$(`[data-ing="${id}"] svg`)||$(`[data-post="${id}"] svg`)||$('#panel');
-const live=g=>[...g.children].filter(c=>!c.classList.contains('gone')),tf=(p,sc=1)=>`translate(${p.x}px,${p.y}px) rotate(${p.r}deg) scale(${sc}) skewX(0deg)`;
+const live=g=>[...g.children].filter(c=>!c.classList.contains('gone')),tf=(p,sc=1)=>`translate(${p.x}px,${p.y}px) rotate(${p.r}deg) scale(${sc*(p.s||1)}) skewX(0deg)`,tfc=(c,p)=>c._rs?`translate(${p.x}px,${p.y}px) rotate(${p.r}deg) scale(${c._rs[0]*(p.s||1)},${c._rs[1]*(p.s||1)}) skewX(${c._rs[2]}deg)`:tf(p);
 const ctx=from=>{const st=$('#stage').getBoundingClientRect(),a=from.getBoundingClientRect();return{st,u:st.width/320,ax:a.left+a.width/2,ay:a.top+a.height/2}};
 function clone(id,c,u){
  const el=document.createElement('div');el.className='fly';el.style.cssText=`left:0;top:0;width:${40*u}px;height:${40*u}px`;
@@ -435,19 +703,19 @@ function tick(now){
  const u=pzU(now),R=baseR()-4,iu=1/u;
  for(let i=flights.length-1;i>=0;i--){
   const f=flights[i],c=f.c;
-  if(!c.isConnected||c.classList.contains('gone')){f.sh.remove();c._fly=0;flights.splice(i,1);continue}
+  if(!c.isConnected||c.classList.contains('gone')){if(c._home&&c.isConnected&&c.parentNode!==c._home){c._home.appendChild(c)}c._home=null;f.sh.remove();c._fly=0;flights.splice(i,1);continue}
   const t=now-f.t0;if(t<0)continue;
   const p=c._p,tn=Math.min(1,t/(TF+TS));f.tx+=(p.x-f.tx)*.35;f.ty+=(p.y-f.ty)*.35;
   const lx=f.tx+f.ox,ly=f.ty+f.oy;
   let x,y,z,rot=p.r,sc;
   if(tn<T1){
    const a=tn/T1,w=f.al*a+(1-f.al)*(1-(1-a)**2),v=1-(1-a)**1.5;
-   z=4*f.H*v*(1-v);x=f.ax+(lx-f.ax)*w;y=f.ay+(ly-f.ay)*w;rot=p.r+320*(1-a)**2;sc=1+.35*z/f.H;
+   z=4*f.H*v*(1-v);x=f.ax+(lx-f.ax)*w;y=f.ay+(ly-f.ay)*w;rot=p.r+320*(1-a)**2;sc=(p.s||1)*(1+.35*z/f.H);
   }else{
    const b=(tn-T1)/(1-T1),e=1-(1-b)**2;
-   z=3*Math.sin(Math.PI*b)**2;x=lx+(f.tx-lx)*e;y=ly+(f.ty-ly)*e;sc=1+.03*z/3;
+   z=3*Math.sin(Math.PI*b)**2;x=lx+(f.tx-lx)*e;y=ly+(f.ty-ly)*e;sc=(p.s||1)*(1+.03*z/3);
   }
-  if(tn>=1){f.sh.remove();c.style.transform=tf(p);flights.splice(i,1);requestAnimationFrame(()=>{c.style.transition='';c._fly=0});continue}
+  if(tn>=1){f.sh.remove();if(c._home){if(c._home.isConnected)c._home.appendChild(c);c._home=null}c.style.transform=tf(p);flights.splice(i,1);requestAnimationFrame(()=>{c.style.transition='';c._fly=0});continue}
   const op=.32*Math.max(0,Math.min(1,(R-Math.hypot(x-160,y-160))/25))*Math.min(1,z/10),sh=f.sh,st=c.style;
   st.opacity=1;st.transform=`translate(${x}px,${y-z*iu}px) rotate(${rot}deg) scale(${sc})`;
   if(op>.004||f.so>.004){sh.setAttribute('cx',x);sh.setAttribute('cy',y+1);sh.setAttribute('fill-opacity',op.toFixed(3))}
@@ -459,7 +727,8 @@ function flyPiece(id,c,k,X,n=1){
  const {u,ax,ay}=X,st=$('#pz').getBoundingClientRect(),j=()=>Math.random()-.5,A={x:(ax-st.left)/u+j()*10,y:(ay-st.top)/u+j()*10},p=c._p;   /* start point jittered inside the marmite */
  const [lx,ly]=landing(id,{x:p.x,y:p.y,fromX:A.x,fromY:A.y}),D=Math.hypot((lx-A.x)*u,(ly-A.y)*u),dS=Math.hypot((p.x-lx)*u,(p.y-ly)*u);
  const al=Math.max(0,Math.min(1,2*dS*TF/(TS*(D||1))));          /* flight end speed = slide start speed */
- c._fly=1;c.style.transition='none';c.style.opacity=0;c.style.transform=`translate(${A.x}px,${A.y}px) rotate(${p.r}deg) scale(1)`;
+ if(S.ns&&S.panType==='k_pizza'&&c.parentNode){let fl=$('#flyLayer');if(!fl){fl=document.createElementNS('http://www.w3.org/2000/svg','g');fl.id='flyLayer'}$('#pz').appendChild(fl);c._home=c.parentNode;fl.appendChild(c)}   /* K: in-flight pieces live in an unclipped overlay above the pan; they return to their resting layer on landing */
+ c._fly=1;c.style.transition='none';c.style.opacity=0;c.style.transform=`translate(${A.x}px,${A.y}px) rotate(${p.r}deg) scale(${p.s||1})`;
  const sh=mk('ellipse',{rx:7,ry:3.2,fill:'#000','fill-opacity':0,cx:A.x,cy:A.y},$('#gShade'));
  flights.push({id,c,sh,ax:A.x,ay:A.y,tx:p.x,ty:p.y,ox:lx-p.x,oy:ly-p.y,al,H:Math.min(190,80+D*.3)*(.88+Math.random()*.24),t0:performance.now()+(k/n)*Math.min(900,26*n)+Math.random()*14});   /* launches spread over the window, slightly varied arcs */
  if(!ticking){ticking=true;requestAnimationFrame(tick)}
@@ -479,17 +748,34 @@ function sprinkle(list,even){
   c.style.opacity=1;c.style.transform=tf(p);});
  setTimeout(()=>list.forEach(c=>{if(c.isConnected)c.style.transition=''}),2000);
 }
-const pcs={};
+const pcs={},pcsL={},pendSync=new Set();let pendRaf=0;
+function syncSoon(id){pendSync.add(id);if(!pendRaf)pendRaf=requestAnimationFrame(flushSync)}
+function flushSync(){pendRaf=0;if(pendSync.size){const ids=[...pendSync];pendSync.clear();sync(ids,null,'pop')}}
+const _noop=0;
+/* sprites: identical shapes are defined ONCE in <defs> and instanced with <use> (1 node instead of ~10); varied shapes are parsed once per (id,i) and cloned */
+const SPR_CACHE=new Map(),symOK={};
+function fillSprite(c,id,i){
+ if(symOK[id]===undefined){let same=false;try{const a=SH[id](0);same=!POST.some(p=>p.id===id)&&a===SH[id](1)&&a===SH[id](9)&&a===SH[id](1017)}catch(e){}symOK[id]=same;
+  if(same){const g=document.createElementNS(NS,'g');g.id='sp_'+id;g.innerHTML=SH[id](0);$('#symDefs').appendChild(g)}}
+ if(symOK[id]){const u=document.createElementNS(NS,'use');u.setAttribute('href','#sp_'+id);c.appendChild(u);return}
+ const k=id+'|'+i;let p=SPR_CACHE.get(k);if(!p){p=document.createElementNS(NS,'g');p.innerHTML=SH[id](i);if(SPR_CACHE.size>3000)SPR_CACHE.clear();SPR_CACHE.set(k,p)}
+ p.childNodes.forEach(n=>c.appendChild(n.cloneNode(true)));
+}
 function sync(ids,from,mode){
  const X=mode==='fly'?ctx(from):null,fresh=[];
  ids.forEach(id=>{
-  const it=[...ING,...POST].find(i=>i.id===id),arr=posFor(it),L=pcs[id]=pcs[id]||[];
-  if(L.length<arr.length){
-   const lay=mk('g',{class:'act'},POST.some(p=>p.id===id)?$('#gPost'):$('#gIng'));lay._id=id;
-   while(L.length<arr.length){const c=mk('g',{class:'it'},lay);c._id=id;c._i=L.length;c.innerHTML=SH[id](c._i);c._p=arr[c._i];c.style.transition='none';c.style.opacity=0;c.style.transform=tf(c._p,mode==='fly'?1:.5);L.push(c);fresh.push(c)}
+  const it=[...ING,...POST].find(i=>i.id===id),post=POST.some(p=>p.id===id),LL=pcsL[id]=pcsL[id]||[];
+  const spec=it.cat?lays(id).map(l=>cntG(it,l.g)):[cnt(it)],arrs=spec.map((n,j)=>posForL(it,n,j));
+  for(let j=0;j<Math.max(LL.length,arrs.length);j++){
+   const arr=arrs[j]||[],L=LL[j]=LL[j]||[];
+   if(L.length<arr.length){
+    const lay=mk('g',{class:'act'},post?$('#gPost'):$('#gIng'));lay._id=id;lay._j=j;
+    while(L.length<arr.length){const c=mk('g',{class:'it'},lay);c._id=id;c._j=j;c._i=L.length+j*1000;fillSprite(c,id,c._i);c._p=arr[L.length];c.style.transition='none';c.style.opacity=0;c.style.transform=tf(c._p,mode==='fly'?1:.5);L.push(c);fresh.push(c)}
+   }
+   const gone=L.splice(arr.length);gone.forEach(c=>{c.classList.add('gone');c._fly=0;c.style.transition='';c.style.opacity=0;c.style.transform=tf(c._p,.4)});if(gone.length)setTimeout(()=>gone.forEach(c=>{const l=c.parentNode;c.remove();if(l&&!l.children.length)l.remove()}),380);
+   L.forEach((c,i)=>{if(fresh.includes(c))return;if(!c._p||c._p.x!==arr[i].x||c._p.y!==arr[i].y){c._p=arr[i];if(!c._fly)c.style.transform=tfc(c,arr[i])}});   /* only the layer that actually changed is touched */
   }
-  const gone=L.splice(arr.length);gone.forEach(c=>{c.classList.add('gone');c._fly=0;c.style.transition='';c.style.opacity=0;c.style.transform=tf(c._p,.4)});if(gone.length)setTimeout(()=>gone.forEach(c=>{const l=c.parentNode;c.remove();if(l&&!l.children.length)l.remove()}),380);
-  L.forEach((c,i)=>{if(fresh.includes(c))return;c._p=arr[i];if(!c._fly)c.style.transform=tf(arr[i])});
+  LL.length=arrs.length;pcs[id]=LL.flat();
  });
  if(mode==='fly'){
   const SPR=new Set(['aru','gon','ice']),by={};
@@ -501,8 +787,8 @@ function sync(ids,from,mode){
  else{$('#pz').getBoundingClientRect();fresh.forEach(c=>{c.style.transition='';c.style.opacity=1;c.style.transform=tf(c._p)})}
 }
 function add(id,d,fly){
- const q=S.qty[id]||0,it=ING.find(i=>i.id===id);S.sel=id;if(d>0&&q>=120)return toast('Максимум для цього інгредієнта',1);if(d<0&&!q)return;
- if(d>0)playToppingSound();S.hist.push({t:'ing',id,before:q});S.qty[id]=d>0?(q?q+10:def(it)):Math.max(0,q-10);sync([id],fly?marm(id):null,fly?'fly':'pop');refresh();panel();
+ const q=S.qty[id]||0,it=ING.find(i=>i.id===id);S.sel=id;if(d>0&&q+STEP_G(it)>MAXG(it))return toast('Максимум для цього інгредієнта',1);if(d<0&&!q)return;
+ if(d>0)playToppingSound();S.hist.push({t:'ing',id,before:q,stack:S.stack.map(l=>({...l}))});const top=S.stack[S.stack.length-1],st=STEP_G(it);if(d>0){if(!q)S.stack.push({id,g:def(it)});else if(top&&top.id===id)top.g+=st;else S.stack.push({id,g:st})}else{let k=S.stack.length-1;while(k>=0&&S.stack[k].id!==id)k--;if(k>=0){S.stack[k].g=Math.max(0,S.stack[k].g-st);if(!S.stack[k].g)S.stack.splice(k,1)}}S.qty[id]=S.stack.filter(l=>l.id===id).reduce((a,l)=>a+l.g,0);if(fly){flushSync();sync([id],marm(id),'fly')}else syncSoon(id);refresh();panel();
 }
 /* ---- panels ---- */
 const ICON={
@@ -516,25 +802,36 @@ function thumb(it){const pos=[[21,23,-20],[43,25,40],[32,44,10]];return `<svg vi
 /* professional rotary pizza cutter: metal wheel (with spokes), blade guard, metal neck, curved plastic handle (white / black) */
 const tool=(c,k)=>{const W=c==='white';return `<path d="M-7-21L7-21L8-34L-6-34Z" fill="#cdd5df" stroke="#8a95a4" stroke-width="1"/><path d="M-21-32C-14-39-4-41 4-47C11-54 17-64 24-73C27-81 40-87 45-77C47-68 41-56 34-48C29-43 23-40 20-37C18-31 21-26 14-21C9-20 8-24 8-28C0-30-12-29-21-32Z" fill="${W?'#f7f7f4':'#15171c'}" stroke="${W?'#aeb4bf':'#3b3f48'}" stroke-width="1.3" stroke-linejoin="round"/><path d="M8-51C15-59 21-67 27-76" fill="none" stroke="${W?'#fff':'#5a5f6b'}" stroke-width="2.2" stroke-linecap="round" opacity=".55"/><path d="M-14-35C-6-35 2-33 8-31" fill="none" stroke="${W?'#d9dde4':'#2a2d34'}" stroke-width="1.2" opacity=".7"/><g${k?' id="kwheel"':''}><circle r="24" fill="url(#steel)" stroke="#8d98a7" stroke-width="1.6"/><circle r="21.3" fill="none" stroke="#f1f4f8" stroke-width="1.3"/><path d="M0-15A15 15 0 0 1 13-7.5M0 15A15 15 0 0 1-13 7.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle r="3.4" fill="#d2d9e2" stroke="#7c8795" stroke-width="1"/><circle cx="-.9" cy="-1" r="1.1" fill="#fff"/></g>`};
 function knife(c){return `<svg viewBox="-28 -102 84 132" width="62" height="98">${tool(c)}</svg>`}
-function panel(){syncUndo();
+const swCats=()=>PC.categories.map(c=>[c.id,c.n]);
+function panel(){syncUndo();setTimeout(()=>{if(S.phase==='rim'&&!S.busy&&!S.ns){const b=$('#panel [data-rim="0"]');b&&b.focus({preventScroll:true})}},0);
  const p=$('#panel'),keep=p.querySelector('.row')?.scrollLeft||0;
- if(S.phase==='sauce')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть соус <span class="text-slate-400 font-normal">— без нього інгредієнти недоступні</span></div><div class="flex justify-around mt-3">${Object.entries(SAUCES).map(([k,s])=>`<button class="sauceb" data-sauce="${k}"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="38" fill="${s.c}"/><ellipse cx="38" cy="38" rx="14" ry="7" fill="#fff" opacity=".2"/></svg>${s.n}</button>`).join('')}</div>`;
+ if(S.phase==='rim'&&S.ns)p.innerHTML=tabsHTML()+`<div class="text-center text-sm font-bold">Оберіть потрібну форму для приготування замовлення</div>`;
+ else if(S.phase==='rim')p.innerHTML=tabsHTML()+`<div class="text-center text-sm font-bold">Борт піци <span class="text-slate-400 font-normal">— сирний: ${SIZES[S.size].cm===35?100:70} г крем-сиру</span></div><div class="flex justify-around mt-3"><button class="sauceb" data-rim="0"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="#e6c283"/><circle cx="50" cy="50" r="30" fill="#f4dfb2"/></svg>Звичайний борт</button><button class="sauceb" data-rim="1"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="#efca8a"/><circle cx="50" cy="50" r="36" fill="none" stroke="#fffdf0" stroke-width="7"/><circle cx="50" cy="50" r="26" fill="#f4dfb2"/></svg>Сирний борт</button></div>`;
+ else if(S.phase==='sauce')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть соус <span class="text-slate-400 font-normal">— без нього інгредієнти недоступні</span></div><div class="flex justify-around mt-3">${Object.entries(SAUCES).map(([k,s])=>`<button class="sauceb" data-sauce="${k}"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="38" fill="${s.c}"/><ellipse cx="38" cy="38" rx="14" ry="7" fill="#fff" opacity=".2"/></svg>${s.n}</button>`).join('')}</div>`;
+ else if(S.phase==='build'&&S.panType==='sandwich'&&(S.cat==='gr'||S.cat==='sauce')){   /* Піца-сендвіч: spices / greens and topping sauces go in BEFORE the oven */
+  const sc=S.cat==='sauce',cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';S.pcat=S.cat;
+  p.innerHTML=`<div class="flex gap-2 overflow-x-auto" style="flex-wrap:nowrap">${swCats().map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
+  <div class="flex items-center gap-2 mt-2 h-11"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${ps?pn:'Доткніться інгредієнта'}</div><button class="stp" data-pw="${ps||''}" data-d="-1" ${ps?'':'disabled'} aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${ps?pwG(ps):0} г</b><button class="stp" data-pw="${ps||''}" data-d="1" ${ps?'':'disabled'} aria-label="Більше">+</button><button class="bake" data-bake>У піч</button></div>
+  <div class="flex justify-around mt-2">${sc?TOPS.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
  else if(S.phase==='build'){const list=ING.filter(i=>i.cat===S.cat),sel=ING.find(i=>i.id===S.sel),q=sel?S.qty[sel.id]||0:0;
-  p.innerHTML=`<div class="flex gap-2">${CATS.map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
-  <div class="flex items-center gap-2 mt-2 h-11"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${sel?sel.n:'Торкніться інгредієнта'}</div><button class="stp" data-m aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${q} г</b><button class="stp" data-p aria-label="Більше">+</button><button class="bake" data-bake>У піч</button></div>
-  <div class="row flex gap-2 overflow-x-auto mt-2 pb-1">${list.map(i=>`<button class="ing ${S.sel===i.id?'on':''}" data-ing="${i.id}">${thumb(i)}<span>${i.n}</span>${S.qty[i.id]?`<i class="bdg">${S.qty[i.id]}</i>`:''}</button>`).join('')}</div>`;
+  p.innerHTML=`<div class="flex gap-2 ${S.panType==='sandwich'?'overflow-x-auto':''}" ${S.panType==='sandwich'?'style="flex-wrap:nowrap"':''}>${(S.panType==='sandwich'?swCats():CATS).map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
+  <div class="flex items-center gap-2 mt-2 h-11"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${sel?sel.n:'Торкніться інгредієнта'}</div><button class="stp" data-m aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${fg(q)} г</b><button class="stp" data-p aria-label="Більше">+</button><button class="bake" data-bake>У піч</button></div>
+  <div class="row flex gap-2 overflow-x-auto mt-2 pb-1">${list.map(i=>`<button class="ing ${S.sel===i.id?'on':''}" data-ing="${i.id}">${thumb(i)}<span>${i.n}</span>${S.qty[i.id]?`<i class="bdg">${fg(S.qty[i.id])}</i>`:''}</button>`).join('')}</div>`;
   p.querySelector('.row').scrollLeft=keep}
  else if(S.phase==='bake')p.innerHTML='<div class="h-full flex flex-col items-center justify-center gap-2"><div class="text-lg font-extrabold">Випікання в дров’яній печі…</div><div class="text-sm text-slate-400">Сир плавиться, скоринка рум’яніє</div></div>';
  else if(S.phase==='cut')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть ніж для нарізання</div><div class="text-center text-xs text-slate-400 mt-1">Біла ручка — вегетаріанська піца, чорна — піца з м'ясом</div><div class="flex justify-around mt-4"><button class="knifeb" data-knife="white">${knife('white')}Білий ніж</button><button class="knifeb" data-knife="black">${knife('black')}Чорний ніж</button></div>`;
- else if(S.phase==='post'){const sc=S.pcat==='sauce',cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';
-  p.innerHTML=`<div class="flex gap-2"><button class="tab ${!sc?'on':''}" data-pcat="gr">Зелень та спеції</button><button class="tab ${sc?'on':''}" data-pcat="sauce">Соус топінг</button></div>
+ else if(S.phase==='post'&&S.panType==='sandwich')p.innerHTML=`<div class="flex items-center gap-2 mt-5 h-12"><div class="flex-1 min-w-0 text-sm font-bold">Піца-сендвіч у коробці — закрийте її</div><button class="ready" data-ready>Готово</button></div>`;
+ else if(S.phase==='post'){if(!fmtCfg().allowFinishingSauce)S.pcat='gr';const sc=S.pcat==='sauce'&&fmtCfg().allowFinishingSauce,cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';
+  p.innerHTML=`<div class="flex gap-2"><button class="tab ${!sc?'on':''}" data-pcat="gr">Зелень та спеції</button>${fmtCfg().allowFinishingSauce?`<button class="tab ${sc?'on':''}" data-pcat="sauce">Соус топінг</button>`:''}</div>
   <div class="flex items-center gap-2 mt-2 h-12"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${ps?pn:'Доткніться інгредієнта'}</div><button class="stp" data-pw="${ps||''}" data-d="-1" ${ps?'':'disabled'} aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${ps?pwG(ps):0} г</b><button class="stp" data-pw="${ps||''}" data-d="1" ${ps?'':'disabled'} aria-label="Більше">+</button><button class="ready" data-ready>Готово</button></div>
   <div class="flex justify-around mt-2">${sc?TOPS.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
  else p.innerHTML='';
 }
 $('#panel').addEventListener('click',e=>{
  const t=e.target.closest('button');if(!t||S.busy)return;const d=t.dataset;
- if(d.sauce!==undefined)applySauce(d.sauce,t.querySelector('svg'));
+ if(d.tab!==undefined)setCat(d.tab==='ns');
+ else if(d.rim!==undefined)chooseRim(d.rim==='1');
+ else if(d.sauce!==undefined)applySauce(d.sauce,t.querySelector('svg'));
  else if(d.cat){S.cat=d.cat;panel()}
  else if(d.ing)add(d.ing,1,true);
  else if(d.m!==undefined)S.sel&&add(S.sel,-1,false);
@@ -543,15 +840,360 @@ $('#panel').addEventListener('click',e=>{
  else if(d.pw)adjPost(d.pw,+d.d);
  else if(d.knife)pickKnife(d.knife,t);
  else if(d.post)selPost(d.post,t);
- else if(d.pcat){S.pcat=d.pcat;panel()}
- else if(d.top)openPattern(d.top);
+ else if(d.pcat){if(d.pcat==='sauce'&&!fmtCfg().allowFinishingSauce)return;S.pcat=d.pcat;panel()}
+ else if(d.top){if(fmtCfg().allowFinishingSauce){if(curFormat()==='k_pizza'||curFormat()==='sandwich'){S.pendingTop=d.top;drizzle(d.top,'zig')}else openPattern(d.top)}}   /* К-Піца: no pattern dialog, straight to the vertical zigzag */
  else if(d.ready!==undefined)finish();
 });
-$('#sizes').addEventListener('click',e=>{const b=e.target.closest('[data-size]');if(!b||S.busy||b.disabled)return;S.size=b.dataset.size;checkSize(true);refresh();sync(ALL,null,'pop')});
+$('#sizes').addEventListener('click',e=>{const b=e.target.closest('[data-size]');if(!b||S.busy||b.disabled)return;if(S.ns){startPan(b.dataset.size);return}S.size=b.dataset.size;checkSize(true);refresh();sync(ALL,null,'pop')});
+/* ---- cheese rim: flatten the edge -> pipe a cream-cheese ring with a piping bag -> roll the dough over it and pinch shut (~1.9 s) ---- */
+async function chooseRim(on){
+ if(S.busy)return;S.busy=1;
+ if(on){
+  playToppingSound();S.hasCheeseRim=true;
+  const E=(n,a)=>$('#'+n).setAttribute(...a),ea=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2,cl=(t,a,b)=>Math.max(0,Math.min(1,(t-a)/(b-a))),bag=$('#bag'),kk=SIZES[S.size].cm/35,pz=$('#pz').getBoundingClientRect(),uu=pz.width/320,BS=84;
+  const cr=$('#crust'),sw=(id,v)=>$('#'+id).setAttribute('stroke-width',v),op=(id,v)=>$('#'+id).setAttribute('opacity',v);
+  await new Promise(res=>{const t0=performance.now(),D=1900,step=n=>{
+   const t=n-t0,a=cl(t,0,450),b=cl(t,450,1250),c=cl(t,1250,1900);
+   /* 1 flatten: the rolled edge spreads outwards, leaving a wide flat channel */
+   cr.setAttribute('r',150+5*ea(a)-1*ea(c));sw('rmWide',16*ea(a)*(1-ea(c)));op('rmGroove',.7*ea(a)*(1-ea(c)));
+   /* 2 piping: the bag tip travels once around the rim and lays the cream line behind it */
+   const ang=-Math.PI/2+2*Math.PI*ea(b),off=100-100*ea(b);
+   op('rmCream',b>0&&c<.75?1:0);op('rmCreamSh',b>0&&c<.75?.9:0);$('#rmCream').setAttribute('stroke-dashoffset',off);$('#rmCreamSh').setAttribute('stroke-dashoffset',off);
+   if(b>0&&c===0){const x=pz.left+(160+141*kk*Math.cos(ang))*uu,y=pz.top+(160+141*kk*Math.sin(ang))*uu;bag.style.transform=`translate3d(${x-.1*BS}px,${y-.9*BS}px,0)`;bag.style.opacity=Math.min(1,b*12)}
+   else if(c>0)bag.style.opacity=Math.max(0,1-c*6);
+   /* 3 fold: the dough rolls inwards over the cream and seals; the rim ends plump and thick */
+   $('#rmFold').setAttribute('stroke-width',22*ea(c));$('#rmFold').setAttribute('r',146-6*ea(c));
+   op('rmHi',.38*ea(cl(c,.4,1)));op('rmSh',.3*ea(cl(c,.4,1)));op('rmSeam',.55*ea(cl(c,.6,1)));
+   if(t<D)requestAnimationFrame(step);else res()};requestAnimationFrame(step)});
+  bag.style.opacity=0;op('rmCream',0);op('rmCreamSh',0);
+  S.hist=S.hist;toast(`Сирний борт додано (${RIMG(SIZES[S.size].cm)} г)`);
+ }
+ S.phase='sauce';S.busy=0;refresh();panel();
+}
+
+/* ================= NON-STANDARD PIZZAS: К-Піца (loaf pan) / Піца Капкейки (6-well tin) ================= */
+const PANICO={
+ W:'<svg class="pico" viewBox="0 0 40 24" aria-hidden="true"><path d="M5 4A15 15 0 0 1 35 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2" opacity=".5"/><path d="M5 4H35A15 15 0 0 1 5 4Z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" transform="translate(0 4)"/></svg>',
+ K:'<svg class="pico" viewBox="0 0 40 24" aria-hidden="true"><path d="M3 4h34l-3 16H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 8h24l-2 8H10z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M3 4l5 4M37 4l-5 4M6 20l4-4M34 20l-4-4" stroke="currentColor" stroke-width="1" fill="none"/></svg>',
+ C:'<svg class="pico" viewBox="0 0 40 24" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="21" rx="8" fill="none" stroke="currentColor" stroke-width="1.8"/>'+[[9,7],[20,7],[31,7],[9,17],[20,17],[31,17]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="4.2" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.3"/>`).join('')+'</svg>'},
+ eio=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2,eout=t=>1-Math.pow(1-t,3),cl01=(t,a,b)=>Math.max(0,Math.min(1,(t-a)/(b-a))),
+ tl=(D,fn)=>new Promise(res=>{const t0=performance.now(),st=n=>{const t=Math.min(D,n-t0);fn(t);t<D?requestAnimationFrame(st):res()};requestAnimationFrame(st)}),
+ WELLS=[[62,112],[160,112],[258,112],[62,208],[160,208],[258,208]],PW=[[100,130],[160,130],[220,130],[100,190],[160,190],[220,190]],PK=60/74,   /* PW = tightly packed cup centres inside the box (60 units = one cup diameter, touching) */
+ KF={x:42,y:119,w:236,h:82},   /* K dough sheet on the pan floor; 6 well centres */
+ tabsHTML=()=>(currentGameMode&&currentGameMode!=='all')?'':`<div class="tabs"><button class="tabb ${S.ns?'':'on'}" data-tab="std">Стандартні</button><button class="tabb ${S.ns?'on':''}" data-tab="ns">Нестандартні піци</button></div>`;
+function buildPans(){
+ const L=$('#nsLayer'),sp=(n,f)=>[...Array(n)].map((_,i)=>f(i)).join('');
+ /* --- loaf pan: charcoal flange, tapered walls (shaded per side), recessed floor --- */
+ const dimp=sp(46,i=>{const x=KF.x+10+rnd(i*3.1+1)*(KF.w-20),y=KF.y+8+rnd(i*5.3+2)*(KF.h-16),a=rnd(i*7.7+3)*40-20;return `<g class="kd" opacity="0" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(0)})"><ellipse rx="${(3+rnd(i+9)*3).toFixed(1)}" ry="${(2.4+rnd(i+11)*2.4).toFixed(1)}" fill="#cfae6e" opacity=".42"/><ellipse rx="2.4" ry="1.5" cx="-.8" cy="-1" fill="#fff6dc" opacity=".35"/></g>`});
+ L.innerHTML=`<defs><linearGradient id="kFl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#303030"/><stop offset=".5" stop-color="#232323"/><stop offset="1" stop-color="#181818"/></linearGradient>
+ <linearGradient id="kFloor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d1d1f"/><stop offset="1" stop-color="#121214"/></linearGradient>
+ <clipPath id="kClip"><rect x="${KF.x}" y="${KF.y}" width="${KF.w}" height="${KF.h}" rx="8"/></clipPath>
+ <radialGradient id="cWell" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#a7acb1"/><stop offset=".65" stop-color="#8a9097"/><stop offset="1" stop-color="#5a5f66"/></radialGradient>
+ <radialGradient id="cTray" cx="40%" cy="30%" r="90%"><stop offset="0" stop-color="#5a5650"/><stop offset="1" stop-color="#3b3935"/></radialGradient>
+ <radialGradient id="sDome" cx="36%" cy="30%" r="78%"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".45" stop-color="#fff" stop-opacity=".04"/><stop offset=".85" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".34"/></radialGradient><radialGradient id="cHol" cx="50%" cy="55%" r="55%"><stop offset="0" stop-color="#c9a461"/><stop offset=".75" stop-color="#dcc084"/><stop offset="1" stop-color="#ecd6a0"/></radialGradient></defs>
+ <g id="kTray" style="opacity:0;transition:opacity .5s,transform .6s cubic-bezier(.2,.8,.2,1)"><path d="M32 104H245C262 104 275 108 275 120V200C275 212 262 216 245 216H32Q24 216 24 208V112Q24 104 32 104Z" fill="#f4f1ea" stroke="#d6cfc0" stroke-width="1.4" stroke-linejoin="round"/><path d="M24 104H245C262 104 275 108 275 120H40Z" fill="#e9e4d8"/><path d="M24 216H245C262 216 275 212 275 200H40Z" fill="#fcfbf7"/><polygon points="24,104 40,120 40,200 24,216" fill="#ebe7dc"/><rect x="40" y="120" width="235" height="80" fill="#f8f6f1"/><path d="M24 104L40 120M24 216L40 200M245 104C262 104 275 108 275 120M245 216C262 216 275 212 275 200" stroke="#cfc8b8" stroke-width="1" fill="none"/><rect x="12" y="128" width="12" height="64" rx="3" fill="#efebe1" stroke="#d6cfc0"/><circle cx="18" cy="160" r="4.2" fill="#c9a56a" stroke="#a98348"/></g>
+ <g id="nsK" style="opacity:0;transition:opacity .3s"><g id="kPan" style="transition:opacity .5s">
+  <rect x="8" y="85" width="304" height="150" rx="12" fill="url(#kFl)" stroke="#3f3f3f" stroke-width="1.6"/>
+  <rect x="14" y="91" width="292" height="138" rx="8" fill="none" stroke="#505050" stroke-width="1" opacity=".7"/>
+  <rect x="22" y="99" width="276" height="122" rx="5" fill="#121212" stroke="#303030" stroke-width="1"/>
+  <polygon points="22,99 298,99 280,117 40,117" fill="#0d0d0d"/><polygon points="22,221 298,221 280,203 40,203" fill="#2a2a2a"/>
+  <polygon points="22,99 40,117 40,203 22,221" fill="#171717"/><polygon points="298,99 280,117 280,203 298,221" fill="#1e1e1e"/>
+  <rect x="40" y="117" width="240" height="86" fill="url(#kFloor)"/>
+  <path d="M22 99L40 117M298 99L280 117M22 221L40 203M298 221L280 203" stroke="#4a4a4a" stroke-width="1" fill="none"/>
+  <path d="M22 221H298" stroke="#6a6a6a" stroke-width="1.2" opacity=".6"/><path d="M14 91H306" stroke="#6a6a6a" stroke-width="1" opacity=".5"/>
+  </g>
+  <g id="kDoughG" clip-path="url(#kClip)"><rect id="kDough" x="160" y="160" width="0" height="0" fill="#f4dfb2"/><g id="kDimp">${dimp}</g></g>
+  <ellipse id="kBall" cx="160" cy="-40" rx="26" ry="26" fill="#f4dfb2" stroke="#d9c08a" stroke-width="1.4" opacity="0"/>
+ </g>
+ <g id="cBox" style="opacity:0"><rect x="62" y="92" width="196" height="136" rx="6" fill="#e9e6dc" stroke="#cfcabb" stroke-width="1.4"/><rect x="68" y="98" width="184" height="124" fill="#fbfaf6"/><rect x="68" y="98" width="184" height="8" fill="#000" opacity=".05"/><rect x="68" y="214" width="184" height="8" fill="#fff" opacity=".7"/><path d="M100 98v-5h14v5M153 98v-5h14v5M206 98v-5h14v5M100 222v5h14v-5M153 222v5h14v-5M206 222v5h14v-5" fill="#f1eee6" stroke="#cfcabb" stroke-width="1"/></g>
+ <g id="nsC" style="opacity:0;transition:opacity .3s"><g id="cTin">
+  <rect x="6" y="62" width="308" height="196" rx="64" fill="url(#cTray)" stroke="#2a2724" stroke-width="2"/>
+  <rect x="14" y="70" width="292" height="180" rx="56" fill="none" stroke="#7a736a" stroke-width="1.2" opacity=".45"/>
+  <clipPath id="cTinClip"><rect x="8" y="64" width="304" height="192" rx="62"/></clipPath><g clip-path="url(#cTinClip)">${sp(7,i=>`<ellipse cx="${(30+rnd(i*4.1+1)*260).toFixed(0)}" cy="${(84+rnd(i*6.3+2)*152).toFixed(0)}" rx="${(8+rnd(i+5)*14).toFixed(0)}" ry="${(5+rnd(i+7)*9).toFixed(0)}" fill="#1f1a14" opacity=".28"/>`)}
+  ${sp(110,i=>`<circle cx="${(16+rnd(i*3.7+1)*288).toFixed(1)}" cy="${(72+rnd(i*5.9+2)*176).toFixed(1)}" r="${(.5+rnd(i+3)*1.1).toFixed(1)}" fill="${['#9b948a','#25221f','#bba98a','#777'][i%4]}" opacity=".6"/>`)}</g>
+  ${WELLS.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="41" fill="#2a2a2a" stroke="#1d1d1d" stroke-width="1.5"/><circle cx="${x}" cy="${y}" r="38" fill="url(#cWell)"/><circle cx="${x}" cy="${y}" r="38" fill="none" stroke="#fff" stroke-width="1" opacity=".18"/>${sp(26,i=>`<circle cx="${(x+(rnd(i*3.3+x)-.5)*66).toFixed(1)}" cy="${(y+(rnd(i*4.7+y)-.5)*66).toFixed(1)}" r=".7" fill="${i%3?'#fff':'#222'}" opacity=".55"/>`)}`).join('')}
+  </g><g id="cCups">${WELLS.map(([x,y],i)=>`<g id="cw${i}"><circle class="cBall" cx="${x}" cy="${y-60}" r="10" fill="#f4dfb2" stroke="#d9c08a" opacity="0"/><circle class="cDisc" cx="${x}" cy="${y}" r="0" fill="#f1dba8" stroke="#d6b97c" stroke-width="1.4"/><circle class="cHol" cx="${x}" cy="${y}" r="0" fill="url(#cHol)"/><circle class="cHi" cx="${x}" cy="${y}" r="35" fill="none" stroke="#fff" stroke-width="2" opacity="0"/></g>`).join('')}</g>
+ </g>
+ <g id="nsSauce" style="opacity:0"><clipPath id="nsSc"><rect id="nsScR" x="0" y="0" width="0" height="320"/></clipPath>
+  <g id="nsSK" clip-path="url(#nsSc)"><rect x="${KF.x+2}" y="${KF.y+2}" width="${KF.w-4}" height="${KF.h-4}" rx="6" class="nsSf"/></g>
+  <g id="nsSC">${WELLS.map(([x,y],i)=>`<g class="swl" data-i="${i}" style="transform-box:view-box;transform-origin:${x}px ${y}px"><circle cx="${x}" cy="${y}" r="29.5" class="nsSf"/><circle cx="${x}" cy="${y}" r="29.5" fill="url(#sDome)"/><circle cx="${x}" cy="${y}" r="21" fill="none" stroke="#fff" stroke-width="1" opacity=".14"/><circle cx="${x}" cy="${y}" r="12" fill="none" stroke="#fff" stroke-width="1" opacity=".14"/><path d="M${x-21} ${y-8}A22 22 0 0 1 ${x-6} ${y-21}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".42"/><path d="M${x-12} ${y-3}A12 12 0 0 1 ${x-4} ${y-11}" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></g>`).join('')}</g></g>`;
+}
+buildPans();
+/* ================= ПІЦА-СЕНДВІЧ: thin round dough, filling on the lower half-disc (1 cm inset), folded over like a calzone, baked, boxed in a half-width box ================= */
+const SW_R=107,SW_IN=8.57,SW_RIN=SW_R-SW_IN,SW_Y0=160+SW_IN,SW_GY=213.5;   /* 25 cm disc (8.571 units/cm); filling zone = lower half, 1 cm from the arc and from the fold line */
+const swReg=(r=SW_RIN,y0=SW_Y0)=>{const w=Math.sqrt(Math.max(0,r*r-(y0-160)**2));return `M${(160-w).toFixed(1)} ${y0.toFixed(1)}H${(160+w).toFixed(1)}A${r} ${r} 0 0 1 ${(160-w).toFixed(1)} ${y0.toFixed(1)}Z`};
+const swFit=(x,y,m)=>{y=Math.max(SW_Y0+m,y);const R=SW_RIN-m,dx=x-160,dy=y-160,d=Math.hypot(dx,dy);if(d>R){x=160+dx*R/d;y=160+dy*R/d;if(y<SW_Y0+m){y=SW_Y0+m;const w=Math.sqrt(Math.max(0,R*R-(y-160)**2));x=160+Math.max(-w,Math.min(w,x-160))}}return[x,y]};
+const SW_SL=new Set(['pep','sal','shy','bal','bac']);
+function swCnt(it,g){   /* fixed layouts: sliced meats 9 (4-3-2), cucumbers 12 (5-4-3), cheddar 2; scaled by weight, 20 g = the full scheme */
+ if(g<=0)return 0;if(SW_SL.has(it.id))return Math.max(1,Math.round(9*g/20));if(it.id==='cuc')return Math.max(1,Math.round(12*g/20));if(it.id==='ched')return Math.max(1,Math.round(g/12.5));return 0}
+const SW_SCH={   /* rows along the fold line / the arc, equal steps, symmetric; [slots], centre slot(s), mirrored pairs in fill order */
+ meat:{sl:[[-72,184],[-24,184],[24,184],[72,184],[-48,213.5],[0,213.5],[48,213.5],[-24,242],[24,242]],C:[5],P:[[7,8],[1,2],[4,6],[0,3]]},
+ cuc:{sl:[[-72,181],[-36,181],[0,181],[36,181],[72,181],[-54,210],[-18,210],[18,210],[54,210],[-36,239],[0,239],[36,239]],C:[10,2],P:[[9,11],[6,7],[1,3],[5,8],[0,4]]},
+ ched:{sl:[[-28.8,213],[28.8,213],[0,213]],C:[2],P:[[0,1]]}};
+const SW_OFF=[[0,0,0],[12,8,12],[-12,8,-12],[0,-6,8],[0,13,-8]];   /* per meat KIND (order of adding): dx, dy, rotation - the layer below stays readable */
+function swMeatIdx(it){if(!SW_SL.has(it.id))return 0;const ids=[];S.stack.forEach(l=>{if(SW_SL.has(l.id)&&l.g>0&&!ids.includes(l.id))ids.push(l.id)});const i=ids.indexOf(it.id);return i<0?0:i}
+const swIn=(x,y,m)=>y>=SW_Y0+m-.01&&Math.hypot(x-160,y-160)<=SW_RIN-m+.01;
+function swScheme(it,n,j){
+ const k=it.id==='ched'?'ched':it.id==='cuc'?'cuc':SW_SL.has(it.id)?'meat':null;if(!k)return null;
+ const {sl,C,P}=SW_SCH[k],per=C.length+P.reduce((a,b)=>a+b.length,0),out=[];
+ for(let pass=0;out.length<n;pass++){
+  const need=Math.min(per,n-out.length),pick=[];let m=need;
+  if(k==='ched'){if(m===1)pick.push(2);else pick.push(0,1)}   /* cheddar: one slice centred, else the pair with an equal gap */
+  else{if(m%2&&C.length){pick.push(C[0]);m--}for(const g of P){if(m<=0)break;if(g.length<=m){pick.push(...g);m-=g.length}}for(const c of C){if(m<=0)break;if(!pick.includes(c)){pick.push(c);m--}}}
+  const kd=SW_SL.has(it.id)?swMeatIdx(it):0,[ox,oy,or]=SW_OFF[Math.min(kd,SW_OFF.length-1)],mg=Math.min(EX[it.id]||8,13)*.8;
+  pick.forEach(i=>{let x=160+sl[i][0]+pass*9+j*4,y=sl[i][1]+pass*7;
+   if(kd){const c=[[ox,oy],[ox,-oy],[-ox,oy],[-ox,-oy]].find(([a,b])=>swIn(x+a,y+b,mg));if(c){x+=c[0];y+=c[1]}}   /* keep the shift inside the 1 cm zone: flip direction near the edges */
+   out.push({x,y,r:kd?or*(i%2?-1:1):0,s:1})});
+  if(pass>20||!pick.length)break}
+ return out.slice(0,n)}
+function swPos(it,n,j,id,rot){
+ {const sc=swScheme(it,n,j);if(sc)return sc}   /* low-discrepancy scatter strictly inside the lower half-disc, a piece's own half-extent kept inside the 1 cm inset */
+ const m=Math.min(EX[it.id]||8,13)*.8,R=SW_RIN-m,y0=SW_Y0+m,out=[];let k=1+((Math.floor(id*7)*37)%97),tries=0;
+ while(out.length<n&&tries++<n*60){const x=160-R+halton(k,2)*2*R,y=y0+halton(k++,3)*(160+R-y0);if(Math.hypot(x-160,y-160)<=R)out.push({x,y,r:rot(out.length),s:1})}
+ while(out.length<n)out.push({x:160,y:y0+R*.4,r:rot(out.length),s:1});return out}
+function swPts(){   /* finishing sauce: soft vertical zigzag across the lower half-disc */
+ const R=SW_RIN-9,y0=SW_Y0+9,mx=160-R*.93,mxe=160+R*.93,peaks=Math.round((mxe-mx)/16),dx=(mxe-mx)/peaks,f=2.2,V=[],bot=x=>160+Math.sqrt(Math.max(0,R*R-(x-160)**2))-2;
+ for(let i=0;i<=peaks;i++){const x=mx+i*dx,y=i%2?bot(x):y0;if(i&&i<peaks)V.push([x-f,y],[x+f,y]);else V.push([x,y])}
+ const pts=[V[0]];for(let i=1;i<V.length;i++){const [ax,ay]=V[i-1],[bx,by]=V[i],k=Math.max(1,Math.ceil(Math.hypot(bx-ax,by-ay)/5));for(let q=1;q<=k;q++)pts.push([ax+(bx-ax)*q/k,ay+(by-ay)*q/k])}
+ return pts}
+(function buildSW(){
+ const g=document.createElementNS(NS,'g');g.id='nsW';g.setAttribute('style','opacity:0');
+ const spk=Array.from({length:46},(_,i)=>{const a=rnd(i*3.3+1)*6.283,r=Math.sqrt(rnd(i*5.1+2))*98;return `<ellipse cx="${(160+r*Math.cos(a)).toFixed(1)}" cy="${(160+r*Math.sin(a)).toFixed(1)}" rx="${(1.2+rnd(i+9)*2).toFixed(1)}" ry="${(.8+rnd(i+4)*1.3).toFixed(1)}" fill="#fff8e4" opacity=".4" transform="rotate(${(rnd(i)*180)|0} ${(160+r*Math.cos(a)).toFixed(1)} ${(160+r*Math.sin(a)).toFixed(1)})"/>`}).join('');
+ const bl=Array.from({length:34},(_,i)=>{const a=rnd(i*2.7+11)*3.1416,r=8+Math.sqrt(rnd(i*4.3+3))*92;return `<ellipse cx="${(160+r*Math.cos(a)).toFixed(1)}" cy="${(160+r*Math.sin(a)).toFixed(1)}" rx="${(2+rnd(i+7)*5).toFixed(1)}" ry="${(1.6+rnd(i+2)*3.6).toFixed(1)}" fill="#7a3d10" opacity="${(.18+rnd(i+5)*.3).toFixed(2)}"/>`}).join('');
+ g.innerHTML=`<defs><radialGradient id="swDg" cx="42%" cy="38%" r="75%"><stop offset="0" stop-color="#f7e8c4"/><stop offset=".7" stop-color="#efd9a6"/><stop offset="1" stop-color="#e2c486"/></radialGradient>
+  <radialGradient id="swBk" cx="42%" cy="38%" r="80%"><stop offset="0" stop-color="#e2a549"/><stop offset=".6" stop-color="#cf8a2e"/><stop offset="1" stop-color="#a8601a"/></radialGradient>
+  <clipPath id="swHalf"><path d="${swReg()}"/></clipPath><clipPath id="swLow"><rect x="0" y="160" width="320" height="170"/></clipPath><clipPath id="swLowDisc"><path d="M${160-SW_R} 160A${SW_R} ${SW_R} 0 0 0 ${160+SW_R} 160Z"/></clipPath></defs>
+ <ellipse id="swShd" cx="160" cy="170" rx="${SW_R+3}" ry="${SW_R}" fill="#000" opacity=".28" filter="url(#soft2)" style="transition:opacity .4s"/>
+ <g id="swPlate"><circle id="swDisc" cx="160" cy="160" r="0" fill="url(#swDg)" stroke="#d3b374" stroke-width="1.4"/><g id="swSpk" opacity="0">${spk}</g></g>
+ <ellipse id="swBall" cx="160" cy="-30" rx="26" ry="26" fill="#f1dfb5" stroke="#d9bd82" stroke-width="1.2" opacity="0"/>
+ <g id="swSauce" style="opacity:0"><g clip-path="url(#swHalf)"><path id="swSP" fill="none" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/></g><path id="swSF" d="${swReg()}" style="opacity:0;transition:opacity .35s"/></g>
+ <g id="swBlis" style="opacity:0">${bl}</g>`;
+ $('#nsLayer').appendChild(g)})();
+function swReset(){
+ ['#swFlip','#swCalz'].forEach(q=>{const e=$(q);e&&e.remove()});$('#swShd').style.opacity='';['#gIng','#gPost','#fxPost'].forEach(q=>$(q).removeAttribute('clip-path'));
+ const d=$('#swDisc');d.setAttribute('r',0);$('#swPlate').removeAttribute('clip-path');$('#swPlate').style.opacity=1;d.setAttribute('fill','url(#swDg)');d.style.transform='';
+ $('#swSpk').style.opacity=0;$('#swBlis').style.opacity=0;$('#swBall').setAttribute('opacity',0);
+ const sa=$('#swSauce');sa.style.opacity=0;$('#swSF').style.opacity=0;$('#swSP').setAttribute('d','M0 0');
+ ['#gIng','#gPost','#fxPost','#gShade'].forEach(q=>{const e=$(q);e&&(e.style.visibility='')})}
+async function startSW(){
+ swReset();const W=$('#nsW'),disc=$('#swDisc'),ball=$('#swBall'),spk=$('#swSpk');W.style.opacity=1;await wait(320);let early=false;
+ /* ball drops, squashes, is rolled out into a thin round sheet WITHOUT a puffy rim (pancake-like) */
+ await tl(2300,t=>{
+  if(t>=2300*.9&&!early){early=true;S.phase='sauce';S.busy=0;refresh();panel()}
+  const d=cl01(t,0,450),sq=cl01(t,450,600),p=eout(cl01(t,600,1900));
+  if(t<600){ball.setAttribute('opacity',1);ball.setAttribute('cy',(-30+190*d*d).toFixed(1));ball.setAttribute('rx',26+9*sq);ball.setAttribute('ry',26-9*sq)}
+  else{ball.setAttribute('opacity',0);disc.setAttribute('r',(34+(SW_R-34)*p*(1+.025*Math.sin(p*9)*(1-p))).toFixed(1))}
+  spk.style.opacity=(.9*cl01(t,1500,2200)).toFixed(2)});
+ disc.setAttribute('r',SW_R);
+ if(!early){S.phase='sauce';S.busy=0;refresh();panel()}
+}
+async function applySauceSW(k){   /* tablespoon swirls the sauce back and forth over the lower half-disc only */
+ S.busy=1;playToppingSound();S.sauce=k;const sc=SAUCES[k].c,sa=$('#swSauce'),sp=$('#tbsp'),bowl=$('#tbspBowl'),path=$('#swSP'),sf=$('#swSF'),pr=$('#pz').getBoundingClientRect(),uu=pr.width/320;
+ sf.setAttribute('fill',sc);path.setAttribute('stroke',sc);sf.style.transition='none';sf.style.opacity=0;sa.style.opacity=1;bowl.setAttribute('fill',sc);
+ const rows=7,y0=SW_Y0+9,yb=160+SW_RIN-9,dy=(yb-y0)/(rows-1);let d='';
+ for(let r=0;r<rows;r++){const y=y0+r*dy,w=Math.sqrt(Math.max(0,(SW_RIN-4)**2-(y-160)**2)),a=160-w+4,b=160+w-4;d+=(r?'L':'M')+(r%2?b:a).toFixed(1)+' '+y.toFixed(1)+'L'+(r%2?a:b).toFixed(1)+' '+y.toFixed(1)}
+ path.setAttribute('d',d);const L=path.getTotalLength();path.style.transition='none';path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
+ const P=(x,y)=>`translate3d(${pr.left+x*uu-42}px,${pr.top+y*uu-113}px,0)`,tip=len=>{const q=path.getPointAtLength(len);return[q.x,q.y]};
+ sp.style.left=sp.style.top='0px';sp.style.opacity=1;const [x0,y0b]=tip(0);
+ await tl(260,t=>{const q=eout(t/260);sp.style.transform=P(x0,y0b-90+90*q)});
+ await tl(1500,t=>{const a=t/1500,len=L*a*a*(3-2*a);path.style.strokeDashoffset=L-len;const [x,y]=tip(len);sp.style.transform=P(x,y)});
+ sf.style.transition='opacity .35s';sf.style.opacity=1;const [ex,ey]=tip(L);
+ await tl(380,t=>{const q=t/380;sp.style.transform=P(ex,ey-130*q);sp.style.opacity=1-q});
+ sp.style.opacity=0;sp.style.transform='';S.hist.push({t:'sauce'});S.phase='build';S.busy=0;refresh();panel();toast('Соус нанесено — оберіть інгредієнти');
+}
+const swHalfD='M53 160A107 107 0 0 0 267 160Z',swTopD='M53 160A107 107 0 0 1 267 160Z';
+async function foldSW(){   /* the empty upper half lifts, swings over the fold line and covers the filling; the arc is pinched shut */
+ const pz=$('#pz'),W=$('#nsW'),disc=$('#swDisc');
+ const flip=document.createElementNS(NS,'g');flip.id='swFlip';flip.innerHTML=`<path d="${swTopD}" fill="url(#swDg)" stroke="#d3b374" stroke-width="1.4" stroke-linejoin="round"/><path id="swFlipSh" d="${swTopD}" fill="#000" opacity="0"/>`;
+ const calz=document.createElementNS(NS,'g');calz.id='swCalz';calz.style.opacity=0;
+ const crimp=Array.from({length:43},(_,i)=>{const a=Math.PI*(i+.5)/43,x=160+(SW_R-3.6)*Math.cos(a),y=160+(SW_R-3.6)*Math.sin(a),ox=160+(SW_R-.4)*Math.cos(a),oy=160+(SW_R-.4)*Math.sin(a);return `<path d="M${(160+(SW_R-8)*Math.cos(a)).toFixed(1)} ${(160+(SW_R-8)*Math.sin(a)).toFixed(1)}L${ox.toFixed(1)} ${oy.toFixed(1)}" stroke="#a9763a" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>`}).join('');
+ calz.innerHTML=`<path d="${swHalfD}" fill="url(#swDg)" stroke="#cda868" stroke-width="1.5" stroke-linejoin="round"/><path id="swCalzB" d="${swHalfD}" fill="url(#swBk)" style="opacity:0;transition:opacity 2.3s ease-in-out"/><g clip-path="url(#swLowDisc)" id="swCalzBl" style="opacity:0;transition:opacity 2.3s ease-in-out">${$('#swBlis').innerHTML}</g><path d="M${160-SW_R+8} 160A${SW_R-8} ${SW_R-8} 0 0 0 ${160+SW_R-8} 160" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="2.2"/><g>${crimp}</g><path d="M53 160H267" stroke="#b98a45" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M${160-SW_R+2} 160A${SW_R-2} ${SW_R-2} 0 0 0 ${160+SW_R-2} 160" fill="none" stroke="#7a4d1a" stroke-width="1" opacity=".35"/>`;
+ const top=$('#pzFx');top.appendChild(flip);top.appendChild(calz);   /* above EVERY filling layer, including the topping-sauce overlay */
+ ['#gIng','#gPost','#fxPost'].forEach(q=>$(q).setAttribute('clip-path','url(#swLowDisc)'));   /* nothing of the filling may peek out beyond the half-disc outline */
+ $('#swPlate').setAttribute('clip-path','url(#swLow)');   /* the original upper half hands over to the flap (seamless) */
+ const sh=$('#swFlipSh');
+ await tl(1200,t=>{const p=eio(cl01(t,0,1000)),s=Math.cos(Math.PI*p);flip.setAttribute('transform',`translate(0 160) scale(1 ${s.toFixed(3)}) translate(0 -160)`);sh.setAttribute('opacity',(.22*Math.sin(Math.PI*p)).toFixed(2))});
+ /* flap lies on the filling: swap to the final folded shape, the filling disappears under the dough */
+ ['#gIng','#gPost','#fxPost','#gShade'].forEach(q=>$(q).style.visibility='hidden');$('#swSauce').style.opacity=0;$('#swPlate').style.opacity=0;
+ calz.style.opacity=1;calz.style.filter='drop-shadow(0 2px 2px rgba(0,0,0,.2))';$('#swShd').style.opacity=0;flip.remove();
+ await wait(150);
+ await calz.animate([{transform:'scale(1.04,1.04)'},{transform:'scale(1,1)'}],{duration:260,easing:'ease-out'}).finished.catch(()=>{});
+}
+function bakeColorSW(){const c=$('#swCalz');if(!c)return;c.getBoundingClientRect();$('#swCalzB').style.opacity=1;$('#swCalzBl').style.opacity=1}
+async function bakeSW(){
+ S.busy=1;playFlameSound();S.hist=[];S.phase='bake';refresh();panel();
+ await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+ await foldSW();
+ $('#oven').style.opacity=1;$('#stage').classList.add('hot');await wait(400);
+ $('#stage').classList.add('baked');S.baked=true;setW(total(),2300);bakeColorSW();
+ await wait(2100);$('#oven').style.opacity=0;$('#stage').classList.remove('hot');
+ await boxIn();S.phase='post';S.busy=0;refresh();panel();toast('Піца-сендвіч готова');
+}
+function buildBox(){
+ const g=document.createElementNS(NS,'g');g.id='cFlaps';g.setAttribute('style','opacity:0');
+ const tx=(x,y,rot,txt)=>`<text transform="rotate(${rot} ${x} ${y})" x="${x}" y="${y}" text-anchor="middle" font-family="Manrope,Arial,sans-serif" font-size="8.6" font-weight="900" fill="#fff" letter-spacing=".4">${txt}</text>`;
+ const flap=(id,d,axis,h,mir,extra)=>`<g id="${id}" data-a="${axis}" data-h="${h}"><g class="in"><path d="${d}" fill="#fbfaf6" stroke="#d3cfc2" stroke-width="1.2" stroke-linejoin="round"/><path d="${d}" fill="url(#cShade)" opacity=".5"/></g><g class="out" style="display:none"><path d="${d}" fill="url(#cPat)" stroke="#a31515" stroke-width="1.4" stroke-linejoin="round"/><g transform="${mir}">${extra||''}</g></g><path class="sh" d="${d}" fill="#000" opacity="0"/></g>`;
+ g.innerHTML=`<defs><pattern id="cPat" width="64" height="64" patternUnits="userSpaceOnUse" patternTransform="rotate(-12)"><rect width="64" height="64" fill="#dc2626"/><g fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20L26 13L29 24L9 29Z"/><circle cx="16" cy="22" r="1.6"/><path d="M38 20Q38 9 47 9Q56 9 56 20Z"/><path d="M39 20L41 30H53L55 20"/><rect x="8" y="44" width="24" height="9" rx="4.5"/><path d="M14 44v9M20 44v9M26 44v9"/><path d="M40 46q4-4 8 0t8 0"/></g></pattern>
+ <linearGradient id="cShade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e6e2d6"/></linearGradient></defs>
+ ${flap('cfL','M68 98L36 104Q20 108 20 124V196Q20 212 36 216L68 222Z','x',68,'translate(136 0) scale(-1 1)','')}
+ ${flap('cfR','M252 98L284 104Q300 108 300 124V196Q300 212 284 216L252 222Z','x',252,'translate(504 0) scale(-1 1)','')}
+ ${flap('cfF','M68 222H252L242 306Q240 312 232 312H88Q80 312 78 306Z','y',222,'translate(0 444) scale(1 -1)','')}
+ ${flap('cfD','M68 98L78 16Q80 8 88 8H144Q148 8 148 4Q148 -8 160 -8Q172 -8 172 4Q172 8 176 8H232Q240 8 242 16L252 98Z','y',98,'translate(0 196) scale(1 -1)','')}
+ <g id="cLip" style="opacity:0"><rect x="68" y="200" width="184" height="22" fill="url(#cPat)" stroke="#a31515" stroke-width="1.4"/><path d="M144 200H176" stroke="#4a0b0b" stroke-width="2.4" stroke-linecap="round"/></g>`;
+ $('#pzFx').appendChild(g)}
+buildBox();
+(function(){const g=document.createElementNS(NS,'g');g.id='kSleeve';g.setAttribute('style','opacity:0');
+ const notch=(x,y,up)=>`<path d="M${x-8} ${y}a8 6 0 0 ${up?1:0} 16 0z" fill="#8f2a1d"/><path d="M${x-8} ${y}a8 6 0 0 ${up?1:0} 16 0" fill="none" stroke="#c9780a" stroke-width="1"/>`;
+ g.innerHTML=`<defs><linearGradient id="slG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset=".55" stop-color="#f59e0b"/><stop offset="1" stop-color="#e68a06"/></linearGradient></defs>
+ <rect x="8" y="98" width="304" height="124" rx="7" fill="url(#slG)" stroke="#c97a08" stroke-width="1.6"/><rect x="12" y="102" width="296" height="8" rx="4" fill="#fff" opacity=".22"/>
+ ${notch(70,98,0)}${notch(160,98,0)}${notch(250,98,0)}${notch(70,222,1)}${notch(160,222,1)}${notch(250,222,1)}
+ <text x="36" y="142" font-family="Manrope,Arial,sans-serif" font-size="13" font-weight="800" fill="#2a1608" letter-spacing=".5">ТВОЯ СМАЧНА</text>
+ <text x="35" y="176" font-family="Manrope,Arial,sans-serif" font-size="28" font-weight="900" fill="#e0483a" letter-spacing="1">K-PIZZA</text>
+ <rect x="196" y="132" width="100" height="54" rx="13" fill="#fff"/>
+ <path d="M206 143L226 143L216 167Z" fill="#fbbf24" stroke="#2a1608" stroke-width="1.4" stroke-linejoin="round"/><circle cx="214" cy="152" r="3" fill="none" stroke="#e0483a" stroke-width="1.5"/><circle cx="220" cy="161" r="2.4" fill="none" stroke="#e0483a" stroke-width="1.4"/>
+ <text x="232" y="164" font-family="Manrope,Arial,sans-serif" font-size="11.5" font-weight="900" fill="#111">PIZZA DAY</text>`;
+ $('#pzFx').appendChild(g)})();
+async function startPan(key){
+ if(S.busy||!SIZES[key]||!SIZES[key].ns)return;
+ if(S.phase==='sauce'&&(S.sauce||S.hist.length))return;
+ S.busy=1;playToppingSound();S.size=key;S.panType=key==='K'?'k_pizza':key==='W'?'sandwich':'cupcakes';{const w=$('#nsSC');if(w){w.style.display=key==='C'?'':'none';if(key!=='C')resetSauceNS()}}{const w=$('#nsW');if(w)w.style.opacity=0;if(S.cat==='gr'||S.cat==='sauce')S.cat='meat'}S.hasCheeseRim=false;S.packed=false;uncake();{const kg=$('#kPizzaG');if(kg)kg.remove();['#kDoughG','#nsSauce','#gIng','#gPost','#fxPost','#gShade'].forEach(q=>$(q).style.visibility='')}{const m=$('#nsMelt');m&&m.remove();document.querySelectorAll('#cCups>g,#nsSC .swl').forEach(e=>{e.style.transform='';e.style.filter='';if(e.classList.contains('swl')){const w=WELLS[+e.dataset.i];e.style.transformBox='view-box';e.style.transformOrigin=w[0]+'px '+w[1]+'px'}else{e.style.transformOrigin='';e.style.transformBox=''}});['#cTin','#cBox','#cFlaps'].forEach(q=>{const e=$(q);e.style.transform='';e.style.display='';e.style.transition='';e.style.opacity=q==='#cTin'?1:0})}
+ const K=S.panType==='k_pizza',pk=$('#nsK'),pc=$('#nsC');{const gi=$('#gIng');if(K)gi.setAttribute('clip-path','url(#kClip)');else gi.removeAttribute('clip-path')}   /* fail-safe: toppings are cut at the dough's rounded rectangle */
+ pk.style.opacity=pc.style.opacity=0;$('#nsSauce').style.opacity=0;refresh();checkSize(true);
+ if(S.panType==='sandwich')return startSW();
+ /* reset both pans, then show the chosen one and animate the dough in */
+ const rect=$('#kDough'),ball=$('#kBall'),dimp=[...document.querySelectorAll('.kd')];
+ rect.setAttribute('width',0);rect.setAttribute('height',0);ball.setAttribute('opacity',0);dimp.forEach(d=>d.setAttribute('opacity',0));
+ WELLS.forEach((w,i)=>{const g=$('#cw'+i);g.querySelector('.cBall').setAttribute('opacity',0);g.querySelector('.cDisc').setAttribute('r',0);g.querySelector('.cHol').setAttribute('r',0);g.querySelector('.cHi').setAttribute('opacity',0)});
+ (K?pk:pc).style.opacity=1;await wait(320);let early=false;
+ if(K){
+  /* ball drops into the pan centre, squashes, then is pressed flat across the whole floor (never up the walls), finally dimpled by "fingers" */
+  await tl(2300,t=>{
+   if(t>=2300*.9&&!early){early=true;S.phase='sauce';S.busy=0;refresh();panel()}   /* sauce bar unlocks at 90% of the dough animation */
+   const d=cl01(t,0,450),sq=cl01(t,450,600),p=eout(cl01(t,600,1700)),B=ball;
+   if(t<600){B.setAttribute('opacity',1);B.setAttribute('cy',(-30+190*d*d).toFixed(1));B.setAttribute('rx',26+8*sq);B.setAttribute('ry',26-8*sq);rect.setAttribute('width',0)}
+   else{B.setAttribute('opacity',0);const w=68+(KF.w-68)*p,h=(36+(KF.h-36)*p)*(1+.035*Math.sin(p*9)*(1-p));rect.setAttribute('x',(160-w/2).toFixed(1));rect.setAttribute('y',(160-h/2).toFixed(1));rect.setAttribute('width',w.toFixed(1));rect.setAttribute('height',h.toFixed(1));rect.setAttribute('rx',(18-10*p).toFixed(1))}
+   dimp.forEach((d,i)=>d.setAttribute('opacity',cl01(t,1500+i*14,1750+i*14).toFixed(2)))});
+ }else{
+  await tl(1750,t=>{if(t>=1750*.9&&!early){early=true;S.phase='sauce';S.busy=0;refresh();panel()}   /* sauce bar unlocks ~400 ms before the last cup finishes settling */
+   WELLS.forEach(([x,y],i)=>{const lt=t-i*160,g=$('#cw'+i),b=g.querySelector('.cBall'),ds=g.querySelector('.cDisc'),h=g.querySelector('.cHol'),hi=g.querySelector('.cHi');
+   if(lt<0)return;const d=cl01(lt,0,300);
+   if(lt<300){b.setAttribute('opacity',1);b.setAttribute('cy',(y-60+60*d*d).toFixed(1))}
+   else{b.setAttribute('opacity',0);ds.setAttribute('r',(6+31*eout(cl01(lt,300,620))).toFixed(1));const q=eout(cl01(lt,420,950));h.setAttribute('r',(31*q).toFixed(1));hi.setAttribute('opacity',(.4*q).toFixed(2))}})});   /* ball -> disc fills the well -> centre presses up the walls into a hollow shell */
+ }
+ if(!early){S.phase='sauce';S.busy=0;refresh();panel()}
+}
+function setCat(ns){
+ if(S.busy||S.phase!=='rim'||S.ns===ns)return;
+ S.ns=ns;S.panType=null;S.hasCheeseRim=false;S.size=ns?'K':'M';
+ ['#nsK','#nsC','#nsW'].forEach(q=>$(q).style.opacity=0);
+ if(currentGameMode!=='all'){ORDER=genOrder();const b=$('#ordCard b');if(b)b.textContent=orderText(ORDER)}   /* orders come from the ACTIVE category only - except «Всі формати»: the dropped order stays */
+ checkSize(false);refresh();panel();
+}
+/* ingredient slots: К-Піца = low-discrepancy scatter over the rectangular dough floor; капкейки = quota split over the 6 wells, each well scattered on its own */
+const halton=(i,b)=>{let f=1,r=0;while(i>0){f/=b;r+=f*(i%b);i=Math.floor(i/b)}return r};
+const K_PAD_X=14,K_PAD_Y=12;   /* safe inner inset of the dough rectangle (half-extent of the largest sprite incl. rotation) */
+function nsPos(it,n,j){const o=nsPos0(it,n,j);if(S.panType==='sandwich'){const m=it.id==='ched'?18:Math.min(EX[it.id]||8,13)*.8;o.forEach(p=>{[p.x,p.y]=swFit(p.x,p.y,m)});return o}if(S.panType==='k_pizza'&&it.id!=='ched'){const rad=Math.min(EX[it.id]||8,13)*(o[0]&&o[0].s||1)*.8,PX=Math.max(rad,K_PAD_X),PY=Math.max(rad,K_PAD_Y),minX=KF.x+PX,maxX=KF.x+KF.w-PX,minY=KF.y+PY,maxY=KF.y+KF.h-PY;o.forEach(p=>{p.x=Math.max(minX,Math.min(maxX,p.x));p.y=Math.max(minY,Math.min(maxY,p.y))})}return o}   /* invariant: no sprite leaves the dough rectangle */
+function nsPos0(it,n,j){
+ if(!n)return[];const id=ALL.indexOf(it.id)+j*5.3,ex=Math.min(EX[it.id]||8,13),loose=LOOSE.has(it.id),out=[];
+ const rot=i=>loose?(rnd(i*7+id*11+3)-.5)*90:rnd(i*7+id*11+3)*360;
+ if(S.panType==='cupcakes'){
+  const order=[0,3,2,5,1,4],per=order.map(()=>[]);for(let i=0;i<n;i++)per[order[i%6]].push(i);   /* round-robin: every cup gets a piece, counts differ by at most 1 */
+  const E=EX[it.id]||8,sl=SLICED.has(it.id),spr=sl?Math.min(2.4,(it.id==='ched'?19:26)/E):(it.cat==='veg'&&!KEEP.has(it.id)?1.15:1),kk=S.packed?PK:1,R0=sl?5:Math.max(5,27-E*spr);   /* slices: the real sprite, enlarged only to fill the cup; bulk: unshrunk pinch */
+  per.forEach((idxs,w)=>{const m=idxs.length,[cx,cy]=S.packed?PW[w]:WELLS[w];idxs.forEach((i,k)=>{const r=FIVE.has(it.id)?15*kk:(sl?(k?R0:0):R0*Math.sqrt((k+.5)/m))*kk,a=FIVE.has(it.id)?k*1.256637+id*.7+w*.9:k*2.39996+id+w;out[i]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),r:sl?(k?rot(i):rot(i)*.3):rot(i),s:spr*kk}})});
+  return out;
+ }
+ if(S.panType==='sandwich')return swPos(it,n,j,id,rot);
+ const CH=it.id==='ched',chSd=KF.h-4,KS=CH?chSd/51.4:(it.id==='tom'||it.id==='bel')?1.125:1.5,m=CH?0:(it.id==='mus'||it.id==='bac'||it.id==='blu'||it.id==='chi')?10:it.id==='oni'?6:Math.max(4,ex*KS*1.12),x0=KF.x+m,x1=KF.x+KF.w-m,y0=KF.y+m,y1=KF.y+KF.h-m,W=x1-x0,H=y1-y0,cx=KF.x+KF.w/2,cy=KF.y+KF.h/2;   /* no rim: toppings use the whole dough sheet */
+ const jit=(i,k)=>rnd(i*5+id*3+k)-.5;
+ if(CH){   /* slices as tall as the dough, equal gaps: edge | slice | slice | edge */
+  const gap=(KF.w-n*chSd)/(n+1);for(let i=0;i<n;i++)out.push({x:KF.x+gap*(i+1)+chSd*(i+.5),y:cy,r:0,s:KS});return out}
+ const SL4={pep:[0,0],sal:[.5,0],shy:[0,1],bal:[-.5,1]};   /* [horizontal shift in half-steps*2, lane inverted]: each meat sits in the gaps of the others so all four stay visible */
+ if(SL4[it.id]){const [sh,inv]=SL4[it.id],step=W/n,yl=Math.min(H/2,KF.h/2-m*.55);
+  for(let i=0;i<n;i++){const pos=(((i+.5+sh)%n)+n)%n,lane=n>1?((i%2)^inv):inv,yy=n>1?(lane?cy+yl:cy-yl):cy+(inv?yl*.5:-yl*.5);
+   out.push({x:x0+pos*step+jit(i,1)*2,y:yy+jit(i,2)*2,r:rot(i),s:KS})}
+  return out}
+ if(it.id==='oli'||it.id==='mas'){   /* two staggered rows; black (mas) is the vertical mirror of green (oli), so they interleave */
+  const up=Math.round(n*.4),lo=n-up,[nu,nl]=it.id==='oli'?[up,lo]:[lo,up],yl=Math.min(H/2,22);   /* oli: 4 up / 6 down, mas: 6 up / 4 down */
+  const G4=[1,3,6,8],G6=[0,2,4,5,7,9],slot=(k,c)=>c===4?G4[k]:c===6?G6[k]:Math.floor((k+.5)*10/c);   /* 10 shared slots per row: green and black take complementary ones */
+  for(let i=0;i<n;i++){const top=i<nu,k=top?i:i-nu,c=top?nu:nl;out.push({x:x0+(slot(k,c)+.5)*W/10+jit(i,1)*2,y:cy+(top?-yl:yl)+jit(i,2)*3,r:rot(i),s:KS})}
+  return out}
+ if(it.id==='cuc'){ /* rows pulled 10% towards the centre line */   /* sliced: ONE continuous line (staggered zig-zag when crowded) along the long axis */
+  const dm=2*ex*KS*.85,rows=Math.max(1,Math.min(3,Math.ceil(n*dm*.8/W)));
+  for(let i=0;i<n;i++){const rw=rows>1?i%rows:0,t=n>1?(i+.5)/n:.5;out.push({x:x0+t*W+jit(i,1)*2,y:cy+(rows>1?(rw-(rows-1)/2)*(H/(rows-1||1))*.9:0)+jit(i,2)*2,r:rot(i),s:KS})}
+  return out}
+ if(it.id==='blu'||it.id==='bac'||it.id==='chi'){   /* 8 anchors: 3 top, 3 bottom, 2 staggered mid; fewer pieces take the most balanced ones first, extra pieces repeat the pattern shifted */
+  const A=[[.04,.2],[.5,.2],[.96,.2],[.04,.8],[.5,.8],[.96,.8],[.27,.5],[.73,.5]],ORD=[1,4,6,7,0,5,2,3];
+  for(let i=0;i<n;i++){const a=A[ORD[i%8]],rd=Math.floor(i/8),sx=rd?(rd%2?1:-1)*(10+4*rd):0,sy=rd?(rd%2?-1:1)*5:0,bc=it.id==='bac';
+   out.push({x:x0+a[0]*W+sx+jit(i,1)*6,y:y0+(bc?a[1]:1-a[1])*H+sy+jit(i,2)*5,r:bc?(15+rnd(i*3+id)*30)*(rnd(i*7+id)<.5?-1:1):rot(i),s:KS})}
+  return out}
+ /* everything else (bacon, bulk meats/cheeses, vegetables): stratified-random scatter - even coverage of the whole length, no visible grid */
+ const rows=Math.max(1,Math.min(n,Math.round(Math.sqrt(n*H/W)))),ch=H/rows,veg=it.cat==='veg',bacon=it.id==='bac';let q=0;
+ for(let rw=0;rw<rows;rw++){const cnt=Math.floor(n/rows)+(rw<n%rows?1:0),cw=W/cnt;   /* each row is filled evenly end to end, rows are staggered */
+  for(let c=0;c<cnt;c++,q++)out.push({x:x0+(c+.5+(rw%2?.28:-.28))*cw+jit(q,1)*cw*.8,y:y0+(rw+.5)*ch+jit(q,2)*ch*.8,r:(it.id==='mus'||it.id==='oni')?rnd(q*3+id)*360:veg?(jit(q,3)*30):bacon?(jit(q,3)*70):rot(q),s:KS})}
+ return out;
+}
+function resetSauceNS(){document.querySelectorAll('#nsSC .swl').forEach((e,i)=>{e.getAnimations().forEach(a=>a.cancel());e.style.transformBox='view-box';e.style.transformOrigin=WELLS[i][0]+'px '+WELLS[i][1]+'px';e.style.transform='scale(0)';e.style.opacity=0})}   /* all 6 wells empty until the spoon reaches them */
+async function applySauceNS(k){
+ if(S.panType==='sandwich')return applySauceSW(k);
+ S.busy=1;playToppingSound();S.sauce=k;const sc=SAUCES[k].c,g=$('#nsSauce'),K=S.panType==='k_pizza';
+ document.querySelectorAll('.nsSf').forEach(e=>e.setAttribute('fill',sc));$('#nsSK').style.display=K?'':'none';$('#nsSC').style.display=K?'none':'';
+ g.style.transition='none';{const w=$('#nsSC');if(w)w.style.display=K?'none':''}if(!K)resetSauceNS();g.style.opacity=1;
+ if(K){   /* a tablespoon drops the sauce on the left end, then spreads it with fast oval strokes while travelling left -> right */
+  const R=$('#nsScR'),sp=$('#tbsp'),bowl=$('#tbspBowl'),pr=$('#pz').getBoundingClientRect(),uu=pr.width/320,cy0=KF.y+KF.h/2,P=(x,y)=>`translate3d(${pr.left+x*uu-42}px,${pr.top+y*uu-113}px,0)`;let early=false;
+  bowl.setAttribute('fill',sc);R.setAttribute('width',0);sp.style.left=sp.style.top='0px';sp.style.opacity=1;
+  await tl(215,t=>{const q=eout(t/215);sp.style.transform=P(KF.x+14,cy0-90+90*q)});                       /* enters from above (all timings x1/1.2) */
+  await tl(133,t=>{const q=Math.sin(t/133*Math.PI);sp.style.transform=P(KF.x+14,cy0+8*q);R.setAttribute('width',(KF.x+30*(t/133)).toFixed(1))});   /* dollop lands */
+  const DUR=1250;await tl(DUR,t=>{const p=eio(t/DUR),cx=KF.x+16+(KF.w-32)*p,a=t*.0252,x=cx+13*Math.cos(a),y=cy0+20*Math.sin(a);
+   sp.style.transform=P(x,y);R.setAttribute('width',(KF.x+Math.min(KF.w+4,(cx-KF.x)+22+14*p)).toFixed(1));
+   if(!early&&p>=.95){early=true;S.hist.push({t:'sauce'});S.phase='build';S.busy=0;refresh();panel();toast('Соус нанесено — оберіть інгредієнти')}});   /* ingredient panel unlocks at 95 % */
+  R.setAttribute('width',KF.x+KF.w+4);
+  await tl(200,t=>{const q=t/200;sp.style.transform=P(KF.x+KF.w-16+30*q,cy0-110*q);sp.style.opacity=1-q});sp.style.opacity=0;sp.style.transform='';
+  if(early)return;
+ }
+ else{   /* a teaspoon visits the 6 cups one by one and leaves a domed dollop in each */
+  const els=[...document.querySelectorAll('#nsSC .swl')],sp=$('#tsp'),bowl=$('#tspBowl'),pr=$('#pz').getBoundingClientRect(),uu=pr.width/320,pt=i=>[pr.left+WELLS[i][0]*uu,pr.top+WELLS[i][1]*uu],[x0,y0]=pt(0),T=(x,y)=>`translate3d(${x}px,${y}px,0)`,A=(k,f,o)=>sp.animate(f,{fill:'forwards',...o}).finished;
+  resetSauceNS();bowl.setAttribute('fill',sc);sp.style.left=(x0-30)+'px';sp.style.top=(y0-80)+'px';sp.style.transform=T(0,-70);sp.style.opacity=1;let cur=[0,-70];
+  for(let i=0;i<6;i++){const [x,y]=pt(i),tx=x-x0,ty=y-y0,hv=ty-16;   /* quick: glide over the centre -> dip -> drop falls straight down from the tip -> next */
+   await A(0,[{transform:T(...cur)},{transform:T(tx,hv)}],{duration:i?70:120,easing:'ease-out'});
+   const dip=A(0,[{transform:T(tx,hv)},{transform:T(tx,hv+9),offset:.45},{transform:T(tx,hv)}],{duration:100,easing:'ease-in-out'});
+   const an=els[i].animate([{transform:`translate(0,${-16/uu}px) scale(.2)`,opacity:0},{transform:`translate(0,${-16/uu}px) scale(.2)`,opacity:1,offset:.1},{transform:'translateY(0) scale(1.06)',offset:.8},{transform:'translateY(0) scale(1)'}],{duration:140,delay:30,easing:'cubic-bezier(.5,0,.9,.6)',fill:'both'});an.finished.then(()=>{els[i].style.transform='scale(1)';els[i].style.opacity=1;an.cancel()}).catch(()=>{});playToppingSound();
+   await dip;cur=[tx,hv]}
+  await A(0,[{transform:T(...cur)},{transform:T(cur[0],cur[1]-120),opacity:0}],{duration:120});
+  sp.getAnimations().forEach(x=>x.cancel());sp.style.opacity=0;sp.style.transform='';}
+ S.hist.push({t:'sauce'});S.phase='build';S.busy=0;refresh();panel();toast('Соус нанесено — оберіть інгредієнти');
+}
+function meltNS(){   /* fused, bubbling, golden cheese layer (same palette as the round-pizza melt) over every cup / the loaf */
+ const gi=$('#gIng'),NS_='http://www.w3.org/2000/svg',lays=[...new Set(Object.keys(pcs).filter(id=>ING.find(i=>i.id===id&&i.cat==='che')).flatMap(id=>pcs[id].map(c=>c.parentNode)))];
+ const top=[...gi.children].filter(l=>lays.includes(l)).pop();if(!top)return lays;
+ const old=$('#nsMelt');if(old)old.remove();
+ const g=document.createElementNS(NS_,'g');g.id='nsMelt';g.setAttribute('style','opacity:0;transition:opacity 1.9s ease-in');
+ const bl=(cx,cy,R,seed,n,bx)=>Array.from({length:n},(_,i)=>{const a=rnd(seed+i*3.1)*6.283,d=Math.sqrt(rnd(seed+i*5.3))*R,x=bx?bx[0]+rnd(seed+i*3.1)*bx[2]:cx+d*Math.cos(a),y=bx?bx[1]+rnd(seed+i*5.3)*bx[3]:cy+d*Math.sin(a),q=1.6+rnd(seed+i*7.7)*3.4,k=i%3;
+  return k===0?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${q.toFixed(1)}" fill="#fde68a" opacity=".75"/><circle cx="${(x-q*.3).toFixed(1)}" cy="${(y-q*.3).toFixed(1)}" r="${(q*.4).toFixed(1)}" fill="#fff" opacity=".6"/>`
+   :k===1?`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(q*1.1).toFixed(1)}" ry="${(q*.8).toFixed(1)}" fill="#92400e" opacity=".55"/>`
+   :`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(q*.7).toFixed(1)}" fill="#7c2d12" opacity=".5"/>`}).join('');
+ let h=`<defs><radialGradient id="mG" cx="42%" cy="38%" r="68%"><stop offset="0" stop-color="#f6cf4a"/><stop offset=".55" stop-color="#eab308"/><stop offset="1" stop-color="#ca8a04"/></radialGradient></defs>`;
+ if(S.panType==='cupcakes')h+=WELLS.map(([x,y],i)=>`<g class="mc" data-i="${i}" style="transform-box:view-box;transform-origin:${x}px ${y}px"><circle cx="${x}" cy="${y}" r="30" fill="url(#mG)" stroke="#a16207" stroke-width="1.6"/>${bl(x,y,25,i*17+3,11)}<path d="M${x-20} ${y-10}A22 22 0 0 1 ${x-7} ${y-21}" fill="none" stroke="#fff7d2" stroke-width="2.2" stroke-linecap="round" opacity=".55"/></g>`).join('');
+ else h+=`<g><rect x="${KF.x+3}" y="${KF.y+3}" width="${KF.w-6}" height="${KF.h-6}" rx="10" fill="url(#mG)" stroke="#a16207" stroke-width="1.6"/>${bl(0,0,0,11,46,[KF.x+10,KF.y+10,KF.w-20,KF.h-20])}<path d="M${KF.x+14} ${KF.y+14}H${KF.x+KF.w*.5}" stroke="#fff7d2" stroke-width="2.4" stroke-linecap="round" opacity=".45"/></g>`;
+ g.innerHTML=h;gi.insertBefore(g,top.nextSibling);
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{g.style.opacity=1;lays.forEach(l=>{l.style.transition='opacity 1.9s ease-in';l.style.opacity=0})}));
+ return lays;
+}
+async function bakeNS(){
+ if(S.panType==='sandwich')return bakeSW();
+ S.busy=1;playFlameSound();S.hist=[];S.phase='bake';refresh();panel();
+ await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+ $('#oven').style.opacity=1;$('#stage').classList.add('hot');await wait(400);
+ $('#stage').classList.add('baked');S.baked=true;setW(total(),2300);
+ if(hasCheese())meltNS();   /* fused golden bubbling layer replaces the loose slices */
+ roastPieces();
+ await wait(2100);$('#oven').style.opacity=0;$('#stage').classList.remove('hot');
+ await boxIn();S.phase='post';S.busy=0;refresh();panel();toast('Піца готова');
+}
 /* ---- sauce + spoon ---- */
 async function applySauce(k,el){
+ if(S.ns)return applySauceNS(k);
  playToppingSound();S.busy=1;S.sauce=k;const sc=SAUCES[k].c,sp=$('#spoon'),bowl=$('#spBowl'),a=el.getBoundingClientRect(),st=$('#stage').getBoundingClientRect();
- const ax=a.left+a.width/2,ay=a.top+a.height/2,dx=st.left+st.width/2-ax,dy=st.top+st.height/2-ay,R=st.width/2*124/160*SIZES[S.size].cm/35,T=(x,y)=>`translate3d(${x}px,${y}px,0)`;
+ const ax=a.left+a.width/2,ay=a.top+a.height/2,dx=st.left+st.width/2-ax,dy=st.top+st.height/2-ay,R=st.width/2*(124-rimD())/160*SIZES[S.size].cm/35,T=(x,y)=>`translate3d(${x}px,${y}px,0)`;
  sp.style.transform='';bowl.setAttribute('fill','#c0c8d4');sp.style.left=ax-30+'px';sp.style.top=ay-80+'px';sp.style.opacity=1;
  await sp.animate([{transform:T(0,-34)},{transform:T(0,8)}],{duration:420,easing:'ease-in',fill:'forwards'}).finished;
  bowl.setAttribute('fill',sc);
@@ -559,7 +1201,7 @@ async function applySauce(k,el){
  /* One clock drives both: at every frame the stroke is revealed up to arc length s, and the spoon tip is placed exactly at the point of the
     path at length s (the growing outer edge of the sauce) - so the spoon can neither lag behind nor race ahead. */
  const T4=4.5*2*Math.PI,path=$('#sPath'),kk=SIZES[S.size].cm/35,pz=$('#pz').getBoundingClientRect(),uu=pz.width/320;let d='';
- for(let t=0;t<=T4;t+=.15)d+=(t?'L':'M')+(160+124*t/T4*Math.cos(t)).toFixed(1)+' '+(160+124*t/T4*Math.sin(t)).toFixed(1);
+ for(let t=0;t<=T4;t+=.15)d+=(t?'L':'M')+(160+(124-rimD())*t/T4*Math.cos(t)).toFixed(1)+' '+(160+(124-rimD())*t/T4*Math.sin(t)).toFixed(1);
  path.setAttribute('d',d);path.setAttribute('stroke',sc);const L=path.getTotalLength();
  path.style.transition='none';path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
  sp.getAnimations().forEach(x=>x.cancel());
@@ -618,8 +1260,23 @@ const BOTTLE=(c,c2)=>`<svg viewBox="0 0 120 120" width="120" height="120" style=
  </g>
  <line x1="100" y1="66" x2="100" y2="78" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><circle cx="100" cy="78" r="1.7" fill="${c}"/></svg>`;
 /* Italian spices: a spice mill hovers over the pizza and sweeps across it, grinding - the flakes fall straight down from the mill outlet. No marmite flight. */
+function grindNS(list){   /* mill sweeps a spiral above the tin, tilting, and the flecks drop from under its tip exactly when it passes over them */
+ const pz=$('#pz').getBoundingClientRect(),u=pz.width/320,sx=x=>pz.left+x*u,sy=y=>pz.top+y*u,N=44,DUR=1700,SWm=S.panType==='sandwich',rx=SWm?78:S.panType==='cupcakes'?(S.packed?64:100):110,ry=SWm?30:S.panType==='cupcakes'?(S.packed?44:62):34,cy=SWm?212:160;
+ const pt=k=>{const q=k/N,a=q*Math.PI*2*2.2,r=1-q*.7;return [160+rx*r*Math.cos(a),cy+ry*r*Math.sin(a)]};
+ const g=document.createElement('div');g.className='fly';g.style.cssText='left:0;top:0;width:70px;height:110px;opacity:0;z-index:80';g.innerHTML=MILL;document.body.appendChild(g);
+ const T=(x,y,r)=>`translate3d(${sx(x)-35}px,${sy(y)-102}px,0) rotate(${r}deg)`,fr=[{transform:T(...pt(0),0),opacity:0,offset:0}];
+ for(let k=0;k<=N;k++){const [x,y]=pt(k);fr.push({transform:T(x,y-4,10*Math.sin(k/N*Math.PI*6)),opacity:1,offset:.06+.88*k/N})}
+ const [lx,ly]=pt(N);fr.push({transform:T(lx,ly-30,0),opacity:0,offset:1});
+ g.animate(fr,{duration:DUR+300,easing:'linear',fill:'forwards'}).finished.then(()=>g.remove());
+ list.forEach((c,k)=>{const p=c._p;c.style.transition='none';c.style.opacity=0;c.style.transform=`translate(${p.x}px,${p.y-22}px) rotate(${rnd(k*4.4)*360}deg) scale(.7)`});
+ $('#pz').getBoundingClientRect();
+ list.forEach(c=>{const p=c._p;let bk=0,bd=1e9;for(let k=0;k<=N;k++){const [x,y]=pt(k),d=Math.hypot(x-p.x,y-p.y);if(d<bd){bd=d;bk=k}}
+  const d=(.06+.88*bk/N)*(DUR+300)/1000+.03;
+  c.style.transition=`transform .32s cubic-bezier(.4,0,.9,.5) ${d.toFixed(2)}s,opacity .08s linear ${d.toFixed(2)}s`;c.style.opacity=1;c.style.transform=tf(p)});
+ setTimeout(()=>list.forEach(c=>{if(c.isConnected)c.style.transition=''}),DUR+900);
+}
 function grind(list){
- if(!list.length)return;
+ if(!list.length)return;if(S.ns)return grindNS(list);
  const pz=$('#pz').getBoundingClientRect(),u=pz.width/320,R=baseR(),x0=160-R*.85,x1=160+R*.85,D=1.5,Y0=160-R-26,sx=x=>pz.left+x*u,sy=y=>pz.top+y*u;
  const g=document.createElement('div');g.className='fly';g.style.cssText='left:0;top:0;width:70px;height:110px;opacity:0';g.innerHTML=MILL;document.body.appendChild(g);
  const T=x=>`translate3d(${sx(x)-35}px,${sy(Y0)-102}px,0)`;
@@ -659,6 +1316,14 @@ $('#modal').addEventListener('click',e=>{
 });
 /* The sauce lines are generated analytically as ~5-unit polylines (no getPointAtLength calls, no hidden measuring paths):
    9-pass zig-zag = straight passes + semicircular U-turns, spiral = Archimedean with adaptive step. */
+/* ---- post-bake finishing rules, isolated per format (no global toggles) ---- */
+const formatConfig={standard:{allowFinishingSauce:true,allowSpices:true},k_pizza:{allowFinishingSauce:true,allowSpices:true},cupcakes:{allowFinishingSauce:false,allowSpices:true},sandwich:{allowFinishingSauce:true,allowSpices:true}},
+ curFormat=()=>S.ns?(S.panType==='k_pizza'?'k_pizza':S.panType==='cupcakes'?'cupcakes':S.panType==='sandwich'?'sandwich':'standard'):'standard',fmtCfg=()=>formatConfig[curFormat()];
+function kPts(){   /* vertical zigzag, left -> right, inside the dough rectangle; peaks have a tiny flat so the turns are soft, not needle-sharp */
+ const mx=KF.x+16,mxe=KF.x+KF.w-16,top=KF.y+11,bot=KF.y+KF.h-11,peaks=Math.round((mxe-mx)/15),dx=(mxe-mx)/peaks,f=2.2,V=[];
+ for(let i=0;i<=peaks;i++){const x=mx+i*dx,y=i%2?bot:top;if(i&&i<peaks){V.push([x-f,y],[x+f,y])}else V.push([x,y])}
+ const pts=[V[0]];for(let i=1;i<V.length;i++){const [ax,ay]=V[i-1],[bx,by]=V[i],k=Math.max(1,Math.ceil(Math.hypot(bx-ax,by-ay)/5));for(let q=1;q<=k;q++)pts.push([ax+(bx-ax)*q/k,ay+(by-ay)*q/k])}
+ return pts}
 function wavePts(R){
  const rows=9,top=R*.95,dy=2*top/(rows-1),r=dy/2,yy=j=>-top+j*dy,lim=y=>Math.sqrt(Math.max(0,R*R-y*y));
  const X=t=>Math.max(6,Math.min(lim(yy(t))-3,lim(yy(t+1))-3,lim(yy(t)+dy/2)-r-5)),pts=[];
@@ -678,6 +1343,7 @@ function spiralPts(R){
  return pts}
 /* Hand-poured sauce: instead of one uniform stroke, the line is a filled ribbon whose width varies (slow noise + pooling blobs + tapered start/end)
    and whose centre line has a gentle hand tremor. The reveal is a stroke-mask along the very same centre line, which the bottle tip follows. */
+const sauceJoin=()=>'round',sauceWk=()=>S.ns?1:Math.max(.9,SIZES[S.size].cm/35);   /* (S is shadowed inside organic) */
 function organic(pts,color,c2,layer){
  const n=pts.length-1,S=[0];for(let i=1;i<=n;i++)S.push(S[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));const Lb=S[n];
  const ph=[...Array(6)].map(()=>Math.random()*6.28),nz=s=>(Math.sin(s*.071+ph[0])+.6*Math.sin(s*.163+ph[1])+.35*Math.sin(s*.37+ph[2]))/1.95,wb=s=>1.1*(.7*Math.sin(s*.045+ph[3])+.3*Math.sin(s*.12+ph[4])),
@@ -691,17 +1357,20 @@ function organic(pts,color,c2,layer){
  const mid='dm'+Math.random().toString(36).slice(2,8),mask=mk('mask',{id:mid,maskUnits:'userSpaceOnUse',x:0,y:0,width:320,height:320},layer);
  const mp=mk('path',{d:c.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(''),fill:'none',stroke:'#fff','stroke-width':14,'stroke-linecap':'round','stroke-linejoin':'round'},mask);
  const g=mk('g',{mask:`url(#${mid})`},layer);
- const p1=mk('path',{d:poly(1,0,0),fill:color},g),p2=mk('path',{d:poly(.32,-.6,-.6),fill:c2,'fill-opacity':.6},g);
- const redraw=k=>{p1.setAttribute('d',poly(k,0,0));p2.setAttribute('d',poly(.32*k,-.6*k,-.6*k));mp.setAttribute('stroke-width',14*Math.max(1,k))};   /* k = weight / base weight */
+ /* constant-width extruded sauce: ONE stroked centre line (round caps/joins), no per-length taper or pooling -> identical thickness from first to last loop */
+ const D=c.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(''),W0=5.5*sauceWk();
+ const jn=sauceJoin(),p1=mk('path',{d:D,fill:'none',stroke:color,'stroke-linecap':'round','stroke-linejoin':jn,'stroke-miterlimit':8},g),p2=mk('path',{d:D,fill:'none',stroke:c2,'stroke-linecap':'round','stroke-linejoin':jn,'stroke-miterlimit':8,'stroke-opacity':.55,transform:'translate(-.7 -.7)'},g);
+ const redraw=k=>{const w=W0*Math.min(1.8,Math.max(.9,Math.sqrt(2*k)));p1.setAttribute('stroke-width',w.toFixed(2));p2.setAttribute('stroke-width',(w*.32).toFixed(2));mp.setAttribute('stroke-width',Math.max(14,w+6))};   /* k = weight / base weight: thicker for bigger doses, still uniform along the line */
  /* tip position at arc length len, interpolated from the sampled centre line */
  let hint=1;const at=len=>{len=Math.max(0,Math.min(cl[n],len));while(hint<n&&cl[hint]<len)hint++;while(hint>1&&cl[hint-1]>len)hint--;const f=(len-cl[hint-1])/((cl[hint]-cl[hint-1])||1);return{x:c[hint-1].x+(c[hint].x-c[hint-1].x)*f,y:c[hint-1].y+(c[hint].y-c[hint-1].y)*f}};
  return{mp,L:cl[n]+2,at,redraw};
 }
 async function drizzle(id,pat){
+ if(!fmtCfg().allowFinishingSauce)return;   /* cupcakes: no liquid finishing sauce at all */
  S.busy=1;const T=TOPS.find(t=>t.id===id),R=sauceR()-9;let boat=null;
- const layer=mk('g',{class:'act drip'},$('#fxPost')),pts=pat==='wave'?wavePts(R):spiralPts(R);   /* overlay <svg>: the per-frame stroke reveal repaints only this thin layer */
+ const layer=mk('g',{class:'act drip'},$('#fxPost')),pts=curFormat()==='sandwich'?swPts():curFormat()==='k_pizza'?kPts():pat==='wave'?wavePts(R):spiralPts(R);if(curFormat()==='sandwich'){const cp=mk('clipPath',{id:'swPostClip'},layer);mk('path',{d:swReg(SW_RIN-2,SW_Y0+2)},cp);layer.setAttribute('clip-path','url(#swPostClip)')}if(curFormat()==='k_pizza'){const cp=mk('clipPath',{id:'kPostClip'},layer);mk('rect',{x:KF.x+3,y:KF.y+3,width:KF.w-6,height:KF.h-6,rx:8},cp);layer.setAttribute('clip-path','url(#kPostClip)')}   /* overlay <svg>: the per-frame stroke reveal repaints only this thin layer */
  try{
- const og=organic(pts,T.c,T.c2,layer),path=og.mp,L=og.L;path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
+ const og=organic(pts,T.c,T.c2,layer),path=og.mp,L=og.L;og.redraw(SVK(id));   /* final thickness BEFORE the first frame of the stroke reveal */path.style.strokeDasharray=L;path.style.strokeDashoffset=L;
  boat=document.createElement('div');boat.className='fly';boat.style.cssText='left:0;top:0;width:120px;height:120px;opacity:0';boat.innerHTML=BOTTLE(T.c,T.c2);document.body.appendChild(boat);
  const pz=$('#pz').getBoundingClientRect(),u=pz.width/320,ox=pz.left-100,oy=pz.top-78,tip=len=>{const q=og.at(len);return[ox+q.x*u,oy+q.y*u]},TT=([x,y])=>`translate3d(${x}px,${y}px,0)`,[x0,y0]=tip(0);
  await boat.animate([{transform:TT([x0,y0-120]),opacity:0},{transform:TT([x0,y0]),opacity:1}],{duration:380,easing:'ease-out',fill:'forwards'}).finished;
@@ -710,7 +1379,7 @@ async function drizzle(id,pat){
   path.style.strokeDashoffset=L-len;boat.style.transform=TT(tip(len));if(a<1)requestAnimationFrame(step);else res()};requestAnimationFrame(step)});
  const [ex,ey]=tip(L);await boat.animate([{transform:TT([ex,ey]),opacity:1},{transform:TT([ex,ey-130]),opacity:0}],{duration:400,fill:'forwards'}).finished;
  path.style.strokeDashoffset=0;
- S.drizzles.push({id,pat,g:T.g,g0:T.g,el:layer,redraw:og.redraw});S.hist.push({t:'drip'});S.psel=id;
+ S.drizzles.push({id,pat,g:startW(id,T.g),g0:startW(id,T.g),el:layer,redraw:og.redraw});S.hist.push({t:'drip'});S.psel=id;
  }catch(e){layer.remove();console.error(e)}
  finally{boat&&boat.remove();S.busy=0;refresh();panel()}
 }
@@ -718,7 +1387,7 @@ async function drizzle(id,pat){
 /* Toppings under the melted cheese stay partly visible: every older piece gets a soft hole in the cheese mask - a random 55-105% of its size,
    shifted a little off-centre, so some pieces peek out almost whole and others only show a corner. A thin golden rim marks where the cheese edge flows around it. */
 /* ---- melted cheese as organic patches (no circle, no white film) ---- */
-const HSZ={pep:[11,11],shy:[14,12.2],bac:[16,5],bal:[15.5,8.8],sal:[13,13],hun:[15,4.5],chk:[5.5,5.5],chi:[7,7],cor:[3.4,4],oni:[9,6],pin:[8,6.5],cuc:[8.5,8.5],moz:[3.2,3.2],ched:[25.7,25.7],tom:[4.6,4.6],bel:[4.6,4.6],oli:[5,5],mas:[5,5],mus:[8,8.6]};
+const HSZ={pep:[11,11],shy:[14,12.2],bac:[16,5],bal:[15.5,8.8],sal:[13,13],hun:[7.5,7.5],chk:[5.5,5.5],chi:[7,7],cor:[3.4,4],oni:[9,6],pin:[4.8,3.9],cuc:[8.5,8.5],moz:[3.2,3.2],ched:[25.7,25.7],tom:[4.6,4.6],bel:[4.6,4.6],oli:[5,5],mas:[5,5],mus:[8,8.6]};
 const isCheeseId=id=>ING.find(i=>i.id===id)?.cat==='che';
 /* ---- shared organic-shape helpers (add once, anywhere above buildCheese) ---- */
 function smoothD(p){const n=p.length,m=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2],s=m(p[n-1],p[0]);let d='M'+s[0].toFixed(1)+' '+s[1].toFixed(1);
@@ -815,7 +1484,7 @@ function roastPieces(){
  try{document.querySelectorAll('[id^=bw] animate').forEach(a=>a.beginElement())}catch(e){}   /* wavy outline eases in from 0 instead of popping */
  Object.keys(pcs).forEach(id=>{const it=ING.find(i=>i.id===id);if(!it||it.cat==='che'||BULK.has(id))return;
   pcs[id].forEach((c,k)=>{if(c.classList.contains('gone')||!c._p||c._flat)return;const p=c._p,sx=.92+.05*rnd(k*3.1+ALL.indexOf(id)),sy=.86+.08*rnd(k*5.7+2),sk=(rnd(k*7.3+4)-.5)*10;
-   c.style.transition='transform 2s ease-out';c.style.transform=`translate(${p.x}px,${p.y}px) rotate(${p.r}deg) scale(${sx},${sy}) skewX(${sk}deg)`;
+   c.style.transition='transform 2s ease-out';c._rs=[sx,sy,sk];c.style.transform=tfc(c,p);
    if(it.cat==='meat'){const [ha,hb]=HSZ[id]||[EX[id],EX[id]],sd=k*3.7+ALL.indexOf(id)*11+((Math.random()*90)|0),q=a=>rnd(sd*1.3+a),g=mk('g',{},c);
     c.setAttribute('filter',`url(#bw${(k+ALL.indexOf(id))%4})`);                                                       /* wavy, non-flat outline */
     mk('path',{d:orgShape(0,0,ha*.97,hb*.97,sd,{n:14,amp:.06,lobes:0,rot:0}).d,fill:'none',stroke:'#2f1207','stroke-width':(1.6+q(1)*1.4).toFixed(1),'stroke-opacity':.55,filter:'url(#soft)'},g);   /* burnt rim */
@@ -885,7 +1554,8 @@ function freezeLayout(){
 }
 async function bake(){
  if(S.busy)return;
- if(!Object.values(S.qty).some(v=>v>0))return toast('Додайте хоча б один інгредієнт',1);
+ flushSync();if(!Object.values(S.qty).some(v=>v>0))return toast('Додайте хоча б один інгредієнт',1);
+ if(S.ns)return bakeNS();
  S.busy=1;freezeLayout();   /* 1) lock synchronously, before anything else touches the DOM */
  playFlameSound();S.hist=[];S.phase='bake';refresh();panel();
  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));   /* 2) let the locked frame paint, then start the oven */
@@ -935,12 +1605,94 @@ function togglePost(id){playToppingSound();S.hist.push({t:'post',id,before:!!S.p
 /* ---- packaging ---- */
 /* Step 1 (right after baking): the open box slides in under the pizza and the pizza settles onto the baking parchment.
    The box then simply stays there through cutting and finishing - it is never hidden, re-created or re-shown. Plain CSS transitions only. */
+const cupFold=(el,p,extra)=>{const s=Math.cos(Math.PI*p),a=el.dataset.a,h=el.dataset.h;
+ el.setAttribute('transform',(extra?`translate(0 ${extra}) `:'')+(a==='x'?`translate(${h} 0) scale(${s.toFixed(3)} 1) translate(${-h} 0)`:`translate(0 ${h}) scale(1 ${s.toFixed(3)}) translate(0 ${-h})`));
+ el.querySelector('.in').style.display=s>0?'':'none';el.querySelector('.out').style.display=s>0?'none':'';el.querySelector('.sh').setAttribute('opacity',(.3*Math.sin(Math.PI*p)).toFixed(2))};
+function mkCakes(){   /* every baked cup = ONE rigid group: dough cup + sauce + toppings + melted cheese (+ spices already on it) */
+ const pz=$('#pz'),gi=$('#gIng'),host=document.createElementNS(NS,'g');host.id='cakeG';
+ const near=p=>{let b=0,d=1e9;WELLS.forEach(([x,y],i)=>{const q=Math.hypot(p.x-x,p.y-y);if(q<d){d=q;b=i}});return b};
+ const G=WELLS.map(([x,y],i)=>{const g=document.createElementNS(NS,'g');g.setAttribute('class','baked-cupcake');g.dataset.i=i;g.style.cssText=`transform-box:view-box;transform-origin:${x}px ${y}px`;host.appendChild(g);return g});
+ WELLS.forEach((_,i)=>{G[i].appendChild($('#cw'+i));const w=document.querySelector('#nsSC .swl[data-i="'+i+'"]');if(w)G[i].appendChild(w)});
+ [...gi.children].forEach(l=>{if(l.id==='nsMelt')l.querySelectorAll('.mc').forEach(m=>G[+m.dataset.i].appendChild(m));
+  else if(l.style.opacity!=='0')[...l.children].forEach(c=>{if(c._p&&!c.classList.contains('gone'))G[near(c._p)].appendChild(c)})});
+ [...$('#gPost').querySelectorAll('.it')].forEach(c=>{if(c._p)G[near(c._p)].appendChild(c)});
+ pz.insertBefore(host,$('#gCut'));return G;
+}
+function uncake(){const h=$('#cakeG');if(!h)return;h.querySelectorAll('.baked-cupcake').forEach(g=>[...(g._orig||g.children)].forEach(c=>{if(/^cw\d$/.test(c.id))$('#cCups').appendChild(c);else if(c.classList&&c.classList.contains('swl'))$('#nsSC').appendChild(c);else c.remove()}));h.remove();const f=$('#cFlaps');if(f)$('#pzFx').appendChild(f)}
+async function flattenCakes(G){   /* pre-flight: each cupcake (cup + sauce + toppings + melt, hundreds of nodes) -> ONE bitmap <image> with a baked-in static shadow */
+ const SC=3,U=46,PR=['fill','stroke','stroke-width','opacity','fill-opacity','stroke-opacity','stroke-linecap','stroke-linejoin','stroke-dasharray','transform','transform-origin','transform-box','filter','clip-path','mix-blend-mode','display','visibility','mask'],ser=new XMLSerializer(),fixU=v=>v.replace(/url\((["']?)[^#)"']*#([^)"']+)\1\)/g,'url(#$2)');
+ return Promise.all(G.map(async(g,i)=>{try{
+  const [x,y]=WELLS[i],cl=g.cloneNode(true),o=[g,...g.querySelectorAll('*')],c=[cl,...cl.querySelectorAll('*')];
+  o.forEach((e,k)=>{const cs=getComputedStyle(e);let st='';if(k)PR.forEach(p=>{const v=cs.getPropertyValue(p);if(v&&v!=='none'&&v!=='normal'&&!(p==='opacity'&&v==='1'))st+=p+':'+fixU(v)+';'});c[k].setAttribute('style',st)});
+  let body=ser.serializeToString(cl),defs='';const seen=new Set();
+  for(let n=0;n<4;n++){[...(body+defs).matchAll(/url\(#([^)]+)\)|href="#([^"]+)"/g)].forEach(m=>{const id=m[1]||m[2];if(seen.has(id))return;seen.add(id);const d=document.getElementById(id);if(d)defs+=ser.serializeToString(d)})}
+  const W=2*U*SC,svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${x-U} ${y-U} ${2*U} ${2*U}" width="${W}" height="${W}"><defs>${defs}</defs>${body}</svg>`,img=new Image();
+  await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
+  const cv=document.createElement('canvas');cv.width=cv.height=W;const cx=cv.getContext('2d');cx.shadowColor='rgba(0,0,0,.45)';cx.shadowBlur=10;cx.shadowOffsetY=5;cx.drawImage(img,0,0,W,W);
+  const im=document.createElementNS(NS,'image');im.setAttribute('href',cv.toDataURL('image/png'));im.setAttribute('x',x-U);im.setAttribute('y',y-U);im.setAttribute('width',2*U);im.setAttribute('height',2*U);
+  g._orig=[...g.children];g.replaceChildren(im);
+ }catch(e){/* keep the live vector group for this cup */}}));
+}
+async function cupIn(){   /* cups -> 6 flat bitmaps, GPU-translated into the box; tin just fades; no per-frame filters */
+ const pz=$('#pz'),tin=$('#cTin'),bx=$('#cBox'),fl=$('#cFlaps');
+ document.querySelectorAll('#nsSC .swl').forEach(e=>e.getAnimations().forEach(x=>x.cancel()));
+ const G=mkCakes();pz.insertBefore(fl,$('#cakeG'));await flattenCakes(G);
+ G.forEach(g=>{g.style.willChange='transform';g.style.transition='none'});
+ tin.style.willChange='opacity';tin.style.transition='opacity .35s ease-out';tin.style.opacity=0;                      /* simple fade, tin leaves the tick loop */
+ bx.style.transition=fl.style.transition='opacity .4s ease-out';setTimeout(()=>{bx.style.opacity=1;fl.style.opacity=1},620);
+ await tl(1500,t=>{
+  const a=eio(cl01(t,0,350)),d=eio(cl01(t,450,1050)),e=cl01(t,1250,1500),lf=-12*a*(1-d)+(e>0?2*Math.sin(e*Math.PI)*(1-e):0),sc=1+(PK-1)*d;
+  G.forEach((g,i)=>{g.style.transform=`translate3d(${((PW[i][0]-WELLS[i][0])*d).toFixed(2)}px,${((PW[i][1]-WELLS[i][1])*d+lf).toFixed(2)}px,0) scale(${sc.toFixed(4)})`})});
+ G.forEach(g=>{g.style.willChange=''});S.packed=true;
+ tin.style.display='none';tin.style.willChange='';bx.style.opacity=1;fl.style.opacity=1;[bx,fl].forEach(e=>e.style.transition='');
+}
+async function foldBox(){   /* left flap -> right flap -> front flap -> top lid; the lid's round tongue slides into the front flap's slot */
+ const L=$('#cfL'),R=$('#cfR'),F=$('#cfF'),D=$('#cfD'),lip=$('#cLip');$('#pz').appendChild($('#cFlaps'));   /* folding phase: flaps go on top of everything */
+ await tl(1750,t=>{cupFold(L,eio(cl01(t,0,430)));cupFold(R,eio(cl01(t,300,730)));cupFold(F,eio(cl01(t,680,1080)));
+  const k=cl01(t,1450,1750);cupFold(D,eio(cl01(t,1040,1500)),4*eio(k));lip.style.opacity=eio(k)});
+ await wait(200);   /* sealed red box stays on screen briefly */
+}
+async function rasterNodes(srcs,x,y,w,h,SC=4){   /* several live SVG layers -> ONE bitmap <image> (computed styles are inlined, referenced defs are carried along) */
+ const PR=['fill','stroke','stroke-width','opacity','fill-opacity','stroke-opacity','stroke-linecap','stroke-linejoin','stroke-dasharray','transform','transform-origin','transform-box','filter','clip-path','mix-blend-mode','display','visibility','mask'],ser=new XMLSerializer(),fixU=v=>v.replace(/url\((["']?)[^#)"']*#([^)"']+)\1\)/g,'url(#$2)');
+ let body='';
+ srcs.forEach(src=>{const cl=src.cloneNode(true),o=[src,...src.querySelectorAll('*')],c=[cl,...cl.querySelectorAll('*')];
+  o.forEach((e,k)=>{const cs=getComputedStyle(e);let st='';PR.forEach(p=>{if(!k&&(p==='transform'||p==='transform-origin'||p==='transform-box'))return;const v=cs.getPropertyValue(p);if(v&&v!=='none'&&v!=='normal'&&!(p==='opacity'&&v==='1'))st+=p+':'+fixU(v)+';'});c[k].setAttribute('style',st)});
+  body+=ser.serializeToString(cl)});
+ let defs='';const seen=new Set();
+ for(let n=0;n<4;n++){[...(body+defs).matchAll(/url\(#([^)]+)\)|href="#([^"]+)"/g)].forEach(m=>{const id=m[1]||m[2];if(seen.has(id))return;seen.add(id);const d=document.getElementById(id);if(d)defs+=ser.serializeToString(d)})}
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${x} ${y} ${w} ${h}" width="${w*SC}" height="${h*SC}"><defs>${defs}</defs>${body}</svg>`,img=new Image();
+ await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
+ const cv=document.createElement('canvas');cv.width=w*SC;cv.height=h*SC;cv.getContext('2d').drawImage(img,0,0);
+ const im=document.createElementNS(NS,'image');im.setAttribute('href',cv.toDataURL('image/png'));im.setAttribute('x',x);im.setAttribute('y',y);im.setAttribute('width',w);im.setAttribute('height',h);return im;
+}
+async function trayIn(){   /* К-Піца: the whole baked loaf (dough + sauce + toppings + melt) is flattened into ONE bitmap that lifts out of the pan, arcs across and settles into the tray */
+ const pan=$('#kPan'),tr=$('#kTray'),dg=$('#kDoughG'),sa=$('#nsSauce'),gi=$('#gIng'),pz=$('#pz'),D=80;
+ let G=null;try{const im=await rasterNodes([dg,sa,gi],24,100,272,120);G=document.createElementNS(NS,'g');G.id='kPizzaG';G.appendChild(im);gi.parentNode.insertBefore(G,gi.nextSibling);[dg,sa,gi].forEach(e=>e.style.visibility='hidden')}catch(e){G=null}
+ const parts=G?[G]:[dg,sa,gi];   /* fallback: live layers moved together */
+ const mv=(el,dy)=>{el.style.transform=`translateY(${dy}px)`},pizza=(dy,h)=>{parts.forEach(p=>{mv(p,dy);p.style.filter=h>0?`drop-shadow(0 ${(h*.55).toFixed(1)}px ${(h*.4).toFixed(1)}px rgba(0,0,0,.5))`:''})};
+ [pan,tr,...parts].forEach(e=>e.style.transition='none');tr.style.opacity=0;
+ await tl(2500,t=>{
+  const a=eio(cl01(t,0,550)),p=eio(cl01(t,550,1500)),c=eio(cl01(t,1850,2500));
+  if(t<1500){mv(pan,-D*a);tr.style.opacity=a;mv(tr,D+30*(1-a));const lift=26*Math.sin(Math.PI*p);pizza(-D*a+2*D*p*(t>=550?1:0)-lift,lift)}
+  else if(t<1850){const k=(t-1500)/350;mv(pan,-D);mv(tr,D);pizza(D+2.5*Math.sin(k*Math.PI)*(1-k),0)}
+  else{mv(pan,-D-60*c);pan.style.opacity=1-c;mv(tr,D-D*c);pizza(D-D*c,0)}
+ });
+ [pan,tr,...parts].forEach(e=>{e.style.transition='';e.style.transform='';e.style.filter=''});pan.style.opacity=0;tr.style.opacity=1;
+}
+async function slideSleeve(){   /* the yellow branded sleeve slides over the tray from the right and locks shut */
+ const sl=$('#kSleeve');sl.style.opacity=1;
+ await sl.animate([{transform:'translateX(330px)'},{transform:'translateX(-5px)',offset:.88},{transform:'translateX(0)'}],{duration:1100,easing:'cubic-bezier(.45,.05,.25,1)',fill:'forwards'}).finished;
+ await wait(200);   /* the closed yellow box stays visible briefly before it leaves */
+}
 async function boxIn(){
+ if(S.panType==='k_pizza')return trayIn();
+ if(S.panType==='cupcakes')return cupIn();
  /* real proportions: the box interior is the pizza + 2 cm (1 cm of clearance all round); the parchment is a square just over the pizza diameter */
- const st=$('#stage'),bx=$('#bx'),cm=SIZES[S.size].cm,pxcm=U*st.offsetWidth/320,W=(cm+2)*pxcm+16,par=bx.querySelector('i');
- [bx,$('#lid')].forEach(e=>{e.style.width=e.style.height=W+'px'});
+ const SWb=S.panType==='sandwich',st=$('#stage'),bx=$('#bx'),cm=SWb?25:S.ns?35:SIZES[S.size].cm,pxcm=U*st.offsetWidth/320,W=(cm+2)*pxcm+16,par=bx.querySelector('i'),hf=SWb?.5:1;
+ [bx,$('#lid')].forEach(e=>{e.style.width=W+'px';e.style.height=W*hf+'px'});   /* sandwich: standard width, HALF the height (wide horizontal box) */
  [bx,$('#lid')].forEach(e=>{e.style.setProperty('--c',4*pxcm+'px');e.style.setProperty('--c2',(4*pxcm-.586*7)+'px')});
- Object.assign(par.style,{inset:'auto',left:'50%',top:'50%',width:(cm+1.2)*pxcm+'px',height:(cm+1.2)*pxcm+'px',transform:'translate(-50%,-50%) rotate(1.2deg)'});
+ Object.assign(par.style,{inset:'auto',left:'50%',top:'50%',width:(cm+1.2)*pxcm+'px',height:(cm+1.2)*pxcm*hf+'px',transform:'translate(-50%,-50%) rotate(1.2deg)'});
+ if(SWb){const c=$('#swCalz');if(c){c.style.transformBox='view-box';c.style.transformOrigin='160px 213.5px';c.style.transition='transform .75s cubic-bezier(.4,0,.2,1)';c.getBoundingClientRect();c.style.transform='translate(0px,-53.5px)'}}   /* the folded half-disc stays horizontal, flat side as folded, and is centred in the wide low box */
  st.style.transform='scale(1.05)';            /* pizza is lifted while the box slides in */
  bx.style.transition='none';bx.style.display='block';bx.style.transform='translateX(115vw) rotate(8deg)';bx.getBoundingClientRect();
  bx.style.transition='transform .85s cubic-bezier(.2,.8,.2,1)';bx.style.transform='none';
@@ -952,60 +1704,73 @@ async function boxIn(){
 async function finish(){
  S.busy=1;S.phase='pack';panel();hideOrder();
  const lid=$('#lid'),unit=$('#unit');
+ if(S.panType==='k_pizza')await slideSleeve();else if(S.panType==='cupcakes')await foldBox();else{
  lid.style.transition='none';lid.style.display='flex';lid.style.transform='perspective(800px) rotateX(-88deg)';lid.getBoundingClientRect();
  lid.style.transition='transform .8s cubic-bezier(.4,0,.2,1)';lid.style.transform='perspective(800px) rotateX(0deg)';
- await wait(1050);
- await unit.animate([{transform:'translateY(0) rotate(0deg) scale(1)'},{transform:'translateY(-14px) rotate(0deg) scale(1)',offset:.18},{transform:'translateY(-125vh) rotate(6deg) scale(.7)'}],{duration:1000,easing:'ease-in',fill:'forwards'}).finished;
+ await wait(1000);   /* lid transition .8 s + 200 ms hold */
+ }
+ await unit.animate([{transform:'translateY(0) rotate(0deg) scale(1)'},{transform:'translateY(-14px) rotate(0deg) scale(1)',offset:.18},{transform:'translateY(-125vh) rotate(6deg) scale(.7)'}],{duration:620,easing:'ease-in',fill:'forwards'}).finished;
  report();
 }
 function deviations(){
- const name=recipeName(),cm=ordCm(),tk=TECH[name]?.[cm];if(!tk)return null;   /* reference = the ORDER (recipe + size); a wrong dough size is a separate error in the checklist AND a visible deviation in this table */
+ const name=recipeName(),cm=ordCm(),tk=TB()[name]?.[cm];if(!tk)return null;   /* reference = the ORDER (recipe + size); a wrong dough size is a separate error in the checklist AND a visible deviation in this table */
  const sid=tk.sauceId||'tomato',ks=tkIngs(tk),pk=tkPost(tk),pks=Object.keys(pk),nm=id=>(ING.find(i=>i.id===id)||POST.find(p=>p.id===id)||TOPS.find(t=>t.id===id)).n,
   actPost=id=>{const p=POST.find(x=>x.id===id);return p?(S.post[id]?postG(p):0):S.drizzles.filter(d=>d.id===id).reduce((a,d)=>a+d.g,0)},   /* post-bake herbs/greens or topping sauce */
-  a={dough:SIZES[S.size].g,sauce:S.sauce===sid?sauceG(sid):0,base:baked(),total:total()};
+  a={rim:rimNow(),dough:SIZES[S.size].g,sauce:S.sauce===sid?sauceG(sid):0,base:baked(),total:total()};
  ks.forEach(k=>{a[k]=S.qty[k]||0});pks.forEach(k=>{a[k]=actPost(k)});
- const std=k=>k==='dough'?doughOf(cm):k==='base'?tkBakedTarget(tk):k in pk?pk[k]:tk[k],
-  rows=[['Тісто (основа)','dough'],[SAUCES[sid].n,'sauce'],...ks.map(k=>[nm(k),k]),['Вага після випікання (без додавань після печі)','base'],...pks.map(k=>[`${nm(k)} (після випікання)`,k]),['Загальна вага піци','total']]
+ const rimRef=tkRim(tk)?RIMG(cm):0,std=k=>k==='dough'?doughOf(cm):k==='rim'?rimRef:k==='base'?Math.round(tkBakedTarget(tk)):k in pk?pk[k]:tk[k],
+  rows=[['Тісто (основа)','dough'],[SAUCES[sid].n,'sauce'],...((rimRef||S.hasCheeseRim)?[['Крем-сир (борт)','rim']]:[]),...ks.map(k=>[nm(k),k]),['Вага після випікання','base'],...pks.map(k=>[`${nm(k)} (після випікання)`,k]),['Загальна вага піци','total']]
    .map(([n,k])=>{const s=std(k),v=a[k],d=v-s;return{n,k,s,a:v,d,p:s?d/s*100:(v?100:0)}});
- const extra=[...ING.filter(i=>!ks.includes(i.id)&&S.qty[i.id]).map(i=>`${i.n} ${S.qty[i.id]} г`),...POST.filter(p=>!pks.includes(p.id)&&S.post[p.id]).map(p=>`${p.n} ${postG(p)} г`),...S.drizzles.filter(d=>!pks.includes(d.id)).map(d=>`${TOPS.find(t=>t.id===d.id).n} ${d.g} г`)];
- if(S.sauce&&S.sauce!==sid)extra.push(`${SAUCES[S.sauce].n} ${sauceG(S.sauce)} г (замість: ${SAUCES[sid].n})`);
+ const extra=[...ING.filter(i=>!ks.includes(i.id)&&S.qty[i.id]).map(i=>`${i.n} (${fg(S.qty[i.id])} г)`),...POST.filter(p=>!pks.includes(p.id)&&S.post[p.id]).map(p=>`${p.n} (${postG(p)} г)`),...S.drizzles.filter(d=>!pks.includes(d.id)).map(d=>`${TOPS.find(t=>t.id===d.id).n} (${d.g} г)`)];
+ if(S.sauce&&S.sauce!==sid)extra.push(`${SAUCES[S.sauce].n} (${sauceG(S.sauce)} г) замість: ${SAUCES[sid].n}`);
  return{name,cm,rows,extra,layers:tk.layers?{need:tk.layers,seq:S.seq||[],ok:seqOk(S.seq||[],tk.layers)}:null,pats:patCheck()};
 }
-function devHTML(){try{return devHTMLraw()}catch(e){console.error('devHTML',e);return''}}   /* a report-block error can never break the result screen */
-function devHTMLraw(){
+function devParts(){try{return devPartsRaw()}catch(e){console.error('devParts',e);return{w:'',c:'',x:''}}}   /* a checklist error can never break the result screen */
+function devPartsRaw(){
  const D=deviations();
- if(!D){const nm=recipeName();return TECH[nm]?`<div class="pt-2 border-t border-white/10 text-xs text-amber-300">Немає техкарти «${nm}» для ${ordCm()} см (розмір зі замовлення) — відхилення не розраховано</div>`:''}
- const col=r=>!r.d?'text-emerald-300':Math.abs(r.p)<=DEV_WARN*100?'text-amber-300':'text-red-300',fm=(v,u)=>(v>0?'+':v<0?'−':'')+Math.abs(v)+u;
- return `<div class="pt-2 border-t border-white/10 font-bold">Відхилення від ТК: ${D.name} ${D.cm} см</div>
-  <div class="text-xs text-slate-300">Сира: ${raw()} г → випічка −${raw()-baked()} г: ${baked()} г → + після випікання ${post()} г = ${total()} г</div>
-  ${D.rows.map(r=>`<div class="flex justify-between gap-2 text-xs"><span>${r.n}: ${r.a} / ${r.s} г</span><b class="${col(r)}">${fm(r.d,' г')} (${fm(+r.p.toFixed(1),'%')})</b></div>`).join('')}
-  ${D.pats.map(r=>`<div class="text-xs ${r.ok?'text-emerald-300':'text-red-300'}">Стиль соусу «${r.n}»: ${PAT_N[r.need]} — ${r.ok?'✓ дотримано':'✗ '+(r.got.length?'нанесено: '+r.got.join(', '):'не нанесено')}</div>`).join('')}
-  ${D.layers?`<div class="text-xs ${D.layers.ok?'text-emerald-300':'text-red-300'}">Шари: ${D.layers.need.map(id=>ING.find(i=>i.id===id).n).join(' → ')} — ${D.layers.ok?'✓ дотримано':'✗ порушено (у вас: '+(D.layers.seq.map(id=>ING.find(i=>i.id===id)?.n||id).join(' → ')||'—')+')'}</div>`:''}
-  ${D.extra.length?`<div class="text-xs text-red-300">Додатково, не за ТК: ${D.extra.join('; ')}</div>`:''}`;
+ if(!D){const nm=recipeName();return{w:'',c:TB()[nm]?`<div class="text-xs text-amber-300">Немає техкарти «${esc(nm)}» для ${szT(ordCm())} (розмір зі замовлення) — відхилення не розраховано</div>`:'',x:''}}
+ const ic=ok=>`<b class="${ok?'text-emerald-300':'text-red-300'}" aria-label="${ok?'відповідає ТК':'відхилення від ТК'}">${ok?'✓':'✗'}</b>`,   /* exact match = ✓, any deviation (+/-) = ✗ */
+  row=(t,ok)=>`<div class="flex justify-between items-center gap-3 text-[13px]"><span>${t}</span>${ic(ok)}</div>`,
+  head=(t,cls='text-slate-400')=>`<div class="text-[11px] font-bold uppercase tracking-wide ${cls}">${t}</div>`,
+  isW=r=>r.k==='base'||r.k==='total',W=D.rows.filter(isW),L=D.rows.filter(r=>!isW(r));
+ return{
+  w:head('Підсумок ваги')+W.map(r=>row(`${r.n}: план ${fg(r.s)} г · факт ${fg(r.a)} г`,Math.abs(r.d)<.5)).join('')+`<div class="text-[11px] text-slate-400">Сира ${fg(raw())} г → випічка −${fg(raw()-baked())} г → ${baked()} г → + після випікання ${fg(post())} г = ${fg(total())} г</div>`,   /* block 1: plan vs fact + dynamics */
+  c:head(`Відхилення від ТК: ${esc(D.name)} ${szT(D.cm)}`)+L.map(r=>row(`${r.n}: ${fg(r.a)} / ${fg(r.s)} г`,Math.abs(r.d)<.05)).join(''),                                                                                                         /* block 2: products only */
+  x:D.extra.length?head('Додатково, не за ТК','text-red-300')+D.extra.map(x=>`<div class="text-[13px] text-red-300">+ ${x}</div>`).join(''):''                                                                                       /* block 3 */
+ };
 }
 function report(){
- hideOrder();sfxDone();const d=$('#done'),z=SIZES[S.size],ings=ING.filter(i=>S.qty[i.id]).map(i=>`${i.n} — ${S.qty[i.id]} г`),ps=[...POST.filter(p=>S.post[p.id]).map(p=>p.n),...S.drizzles.map(d=>`${TOPS.find(t=>t.id===d.id).n} (${d.pat==='wave'?'хвиляста лінія':'спіральна лінія'})`)],e=allErrors();
+ hideOrder();sfxDone();const d=$('#done'),z=SIZES[S.size],D=deviations(),e=allErrors(),P=devParts(),
+  ings=ING.filter(i=>S.qty[i.id]).map(i=>`${i.n} — ${S.qty[i.id]} г`),ps=[...POST.filter(p=>S.post[p.id]).map(p=>p.n),...S.drizzles.map(d=>TOPS.find(t=>t.id===d.id).n)],
+  summary=D?'':`<div><b>Піца ${z.cm} см</b> · ${hasMeat()?'з м\'ясом':'вегетаріанська'} · <b>${total()} г</b> (після ужарки −${raw()-baked()} г)</div>
+  <div class="text-slate-300">${SAUCES[S.sauce].n}${ings.length?'; '+ings.join('; '):''}</div>
+  ${ps.length?`<div class="text-slate-300">Після випікання: ${ps.join(', ')}</div>`:''}`,   /* composition only when there is no tech-card checklist */
+  errBlock=`<div class="font-bold ${e.length?'text-red-300':'text-emerald-300'}">${e.length?`Помилок відповідності: ${e.length}`:'Помилок відповідності немає'}</div>`+e.map(x=>`<div class="text-[13px] text-red-300">• ${x}</div>`).join(''),   /* block 4: knife, size, layer order, sauce style */
+  blocks=[P.w,summary,P.c,P.x,errBlock].filter(Boolean).map((h,i)=>`<div class="${i?'mt-2.5 pt-2.5 border-t border-white/10 ':''}space-y-1">${h}</div>`).join('');
  d.style.display='flex';
  d.innerHTML=`<div class="text-5xl">✔</div><div class="text-2xl font-extrabold mt-2" style="color:var(--ok)">Замовлення виконано!</div>
- <div class="mt-4 w-full max-w-[340px] text-left text-sm rounded-2xl bg-white/[.07] border border-white/10 p-4 space-y-1.5">
-  <div><b>Піца ${z.cm} см</b> · ${hasMeat()?'з м\'ясом':'вегетаріанська'} · <b>${total()} г</b> (після ужарки −${raw()-baked()} г)</div>
-  <div class="text-slate-300">${SAUCES[S.sauce].n}${ings.length?'; '+ings.join('; '):''}</div>
-  ${ps.length?`<div class="text-slate-300">Після випікання: ${ps.join(', ')}</div>`:''}
-  <div>Ніж: <b>${S.knife==='white'?'білий':'чорний'}</b></div>
-  ${devHTML()}
-  <div class="pt-2 border-t border-white/10 font-bold ${e.length?'text-red-300':'text-emerald-300'}">${e.length?`Помилок відповідності: ${e.length}`:'Помилок відповідності немає'}</div>
-  ${e.map(x=>`<div class="text-xs text-red-300">• ${x}</div>`).join('')}</div>
+ <div class="mt-4 w-full max-w-[340px] text-left text-sm rounded-2xl bg-white/[.07] border border-white/10 p-4">${blocks}</div>
  <button class="ready mt-5" onclick="nextOrder()">Нове замовлення</button>`;
  for(let i=0;i<30;i++){const s=document.createElement('div'),a=Math.random()*6.28,r=90+Math.random()*150;s.className='spark';s.style.cssText=`left:50%;top:30%;background:hsl(${Math.random()*360} 90% 60%);--x:${Math.cos(a)*r}px;--y:${Math.sin(a)*r}px;animation-delay:${Math.random()*.4}s`;d.appendChild(s)}
 }
 /* ---- order system ---- */
 const ORDER_CATALOG=[   /* extendable: push {kind:'Кальцоне',names:['…'],sizes:()=>[25,30]} */
- {kind:'Піца',names:['Маргарита','Пепероні','Бір Бургер'],sizes:()=>Object.values(SIZES).map(s=>s.cm)}
+ {kind:'Піца',names:['Маргарита','Пепероні','Бір Бургер'],sizes:()=>Object.values(SIZES).filter(s=>!s.ns).map(s=>s.cm)}
 ];
 let ORDER=null;
-const pickOne=a=>a[Math.random()*a.length|0],orderText=o=>`${o.kind} "${o.name}" ${o.size} см`;
+const pickOne=a=>a[Math.random()*a.length|0],orderText=o=>o.ns?(o.size===103?`Піца-сендвіч "${o.name}"`:o.size===102?`Піца капкейк "${o.name}"`:`К-Піца "${o.name}"`):`${o.kind} "${o.name}" ${szT(o.size)}`;
+const nsFocus=()=>currentGameMode==='focus'&&typeof FOCUS==='string'&&FOCUS.startsWith('ns|'),
+ allTK=()=>{   /* ONE shared database: every standard TK (TECH) x every size + every non-standard TK (TECH_NS) x format - read live, so admin edits show up at once */
+  const a=[];for(const n of Object.keys(TECH))for(const cm of pizzaSizes(n))a.push({name:n,size:cm,ns:0});
+  for(const [n,z] of Object.entries(TECH_NS))for(const cm of Object.keys(z))if(Object.values(SIZES).some(v=>v.ns&&v.cm===+cm))a.push({name:n,size:+cm,ns:1});return a};
 function genOrder(){
- const p=pickOne(ORDER_CATALOG),foc=currentGameMode==='focus'&&FOCUS&&TECH[FOCUS],name=foc?FOCUS:pickOne(p.names),sz=pizzaSizes(name),all=sz.length?sz:p.sizes();
+ if(currentGameMode==='all'){   /* «Всі формати піц»: no category filter, random across the whole base (never the same card twice in a row) */
+  const a=allTK();if(a.length){let last=null;try{last=sessionStorage.getItem('pzLastAll')}catch(e){}
+   const f=a.filter(e=>e.ns+'|'+e.size+'|'+e.name!==last),e=pickOne(f.length?f:a);try{sessionStorage.setItem('pzLastAll',e.ns+'|'+e.size+'|'+e.name)}catch(x){}
+   return e.ns?{kind:'Піца',name:e.name,size:e.size,ns:1}:{kind:'Піца',name:e.name,size:e.size}}}
+ if(nsFocus()){const [,cm,...nm]=FOCUS.split('|');return{kind:'Піца',name:nm.join('|'),size:+cm,ns:1}}
+ if(S.ns){const pool=[],pt=S.panType;if(!pt||pt==='k_pizza')recipesByFormat.k_pizza().forEach(n=>pool.push([n,101]));if(!pt||pt==='cupcakes')recipesByFormat.cupcakes().forEach(n=>pool.push([n,102]));if(!pt||pt==='sandwich')recipesByFormat.sandwich().forEach(n=>pool.push([n,103]));const [name,size]=pickOne(pool);return{kind:'Піца',name,size,ns:1}}   /* each format draws only from its own menu */   /* non-standard orders come ONLY from TECH_NS */
+ const p=pickOne(ORDER_CATALOG),foc=currentGameMode==='focus'&&FOCUS&&TECH[FOCUS],name=foc?FOCUS:pickOne([...new Set([...p.names,...Object.keys(TECH)])]),sz=pizzaSizes(name),all=sz.length?sz:p.sizes();
  let last=null;try{last=+sessionStorage.getItem('pzLastSize')}catch(e){}
  const size=pickOne(foc&&all.length>1?all.filter(s=>s!==last):all);   /* targeted mode: only this pizza, random size, never the same size twice in a row */
  try{sessionStorage.setItem('pzLastSize',size)}catch(e){}
@@ -1019,18 +1784,29 @@ function hideOrder(){
  setTimeout(()=>{c.style.display='none'},470);
 }
 /* ---- size validation: non-blocking badge + toast, mismatch kept in session state, listed in the final report ---- */
-const sizeErrText=()=>{if(!ORDER)return'';const made=SIZES[S.size].cm;return made===ORDER.size?'':`Невідповідність розміру: замовлено ${ORDER.size} см, зроблено ${made} см`};
-const allErrors=()=>{const x=sizeErrText();return[...S.errors,...(x?[x]:[]),...patErrs()]};
+const sizeErrText=()=>{if(!ORDER)return'';const made=SIZES[S.size].cm;return made===ORDER.size?'':`Невідповідність розміру: замовлено ${szT(ORDER.size)}, зроблено ${szT(made)}`};
+/* layer order: the real stack (S.seq, saved when the pizza goes into the oven) against the order of ings in the tech card */
+function orderErrs(){
+ const tk=tkMade();if(!tk)return[];
+ const need=tk.layers||tkIngs(tk),seq=(S.seq&&S.seq.length?S.seq:layerSeq()).filter(id=>need.includes(id)),nm=id=>ING.find(i=>i.id===id)?.n||id;
+ let bad=null;
+ if(tk.layers){let j=0;for(const id of seq)if(id===need[j])j++;if(j<need.length)bad=need[j]}   /* repeated layers (e.g. mozzarella under and over): required stack must appear in order */
+ else{const act=[...new Set(seq)],exp=need.filter(id=>act.includes(id));for(let i=0;i<act.length;i++)if(act[i]!==exp[i]){bad=act[i];break}}   /* missing items are weight errors, not order errors */
+ return bad?[`Порушено черговість викладки: ${nm(bad)} викладено не за порядком ТК.`]:[];
+}
+const rimErrs=()=>{const tk=tkMade();if(!tk)return[];return tkRim(tk)&&!S.hasCheeseRim?["Порушено ТК: для цієї піци обов'язковий сирний борт"]:(!tkRim(tk)&&S.hasCheeseRim?['Порушено ТК: сирний борт не передбачено рецептурою']:[])};
+const allErrors=()=>{const x=sizeErrText();return[...S.errors,...(x?[x]:[]),...rimErrs(),...orderErrs(),...patErrs()]};
 function checkSize(notify){
  const w=$('#sizeWarn'),made=SIZES[S.size].cm,mis=!!ORDER&&made!==ORDER.size;
  S.sizeMismatch=mis?{ordered:ORDER.size,made}:null;
- w.style.display=mis?'block':'none';w.textContent=mis?`⚠ ${made} см`:'';w.title=sizeErrText();
- if(mis&&notify)toast(`Розмір не збігається: замовлено ${ORDER.size} см, обрано ${made} см`);
+ w.style.display=mis?'block':'none';w.textContent=mis?`⚠ ${szT(made)}`:'';w.title=sizeErrText();
+ if(mis&&notify)toast(`Розмір не збігається: замовлено ${szT(ORDER.size)}, обрано ${szT(made)}`);
 }
 async function showOrder(){
  if(showOrder.busy)return;showOrder.busy=1;
  const app=$('#app'),ov=$('#ordOv'),card=$('#ordCard'),slot=$('#ordSlot');
  ORDER=genOrder();card.querySelector('b').textContent=orderText(ORDER);
+ if(currentGameMode==='all'&&!!ORDER.ns!==!!S.ns&&S.phase==='rim')setCat(!!ORDER.ns);   /* the cycle switches to the category / format of the dropped tech card */
  delete card.dataset.gone;card.className='';card.style.cssText='opacity:0;transform:scale(.5)';ov.appendChild(card);ov.style.display='';ov.classList.add('on');
  const A=app.getBoundingClientRect(),w=Math.min(A.width*.8,340),h=A.height*.25;      /* centered card, ~25% of the screen */
  Object.assign(card.style,{left:(A.width-w)/2+'px',top:(A.height-h)/2+'px',width:w+'px',height:h+'px'});
@@ -1087,17 +1863,17 @@ const sndBtn=$('#sndBtn'),sndIcon=()=>{sndBtn.textContent=SFX_MUTED?'🔇':'🔊
 sndBtn.addEventListener('click',()=>{SFX_MUTED=!SFX_MUTED;try{localStorage.setItem('pzMute',SFX_MUTED?'1':'0')}catch(e){}sndIcon()});
 document.addEventListener('pointerdown',sfxInit,{passive:true});
 /* ---- start screen / training flow ---- */
-const ACTIVE_MODES=['pizza','focus'];   /* 'focus' = targeted training on one chosen pizza */
+const ACTIVE_MODES=['pizza','focus','custom','all'];   /* 'focus' = targeted training on one chosen pizza */
 const focusStore={get:()=>{try{return sessionStorage.getItem('pzFocus')}catch(e){return null}},set:n=>{try{n?sessionStorage.setItem('pzFocus',n):sessionStorage.removeItem('pzFocus')}catch(e){}}};
 let FOCUS=null,PICK=[];
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
  pizzaSizes=n=>Object.keys(TECH[n]||{}).map(Number).filter(cm=>Object.values(SIZES).some(s=>s.cm===cm)).sort((a,b)=>a-b);   /* sizes that have a tech card */
-function openPick(){PICK=Object.keys(TECH);$('#pickList').innerHTML=PICK.map((n,i)=>`<button type="button" data-i="${i}">${esc(n)}<small>${pizzaSizes(n).join(' · ')} см</small></button>`).join('');$('#ssMenu').style.display='none';$('#pickPanel').classList.add('on')}
+function openPick(){PICK=[...Object.keys(TECH).map(n=>({key:n,label:n,sub:pizzaSizes(n).join(' · ')+' см'})),...Object.entries(TECH_NS).flatMap(([n,z])=>Object.keys(z).filter(cm=>Object.values(SIZES).some(v=>v.ns&&v.cm===+cm)).map(cm=>({key:`ns|${cm}|${n}`,label:n,sub:szT(+cm)})))];$('#pickList').innerHTML=PICK.map((e,i)=>`<button type="button" data-i="${i}">${esc(e.label)}<small>${esc(e.sub)}</small></button>`).join('');$('#ssMenu').style.display='none';$('#pickPanel').classList.add('on')}
 const closePick=()=>{$('#pickPanel').classList.remove('on');$('#ssMenu').style.display=''};
 function startFocus(n){FOCUS=n;focusStore.set(n);closePick();startGame('focus')}
 $('#ssPick').addEventListener('click',()=>RECIPES_READY.then(openPick));   /* catalog is read after recipes.json has been applied */
 $('#pickBack').addEventListener('click',closePick);
-$('#pickList').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)startFocus(PICK[+b.dataset.i])});   /* add ids here (and remove `disabled` on their buttons) to unlock a mode */
+$('#pickList').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)startFocus(PICK[+b.dataset.i].key)});   /* add ids here (and remove `disabled` on their buttons) to unlock a mode */
 let currentGameMode=null;   /* 'pizza' | 'custom' | 'all' - pick per-mode catalogs inside genOrder() when they exist */
 const modeStore={get:()=>{try{return sessionStorage.getItem('pzMode')}catch(e){return null}},set:m=>{try{m?sessionStorage.setItem('pzMode',m):sessionStorage.removeItem('pzMode')}catch(e){}}};
 function restartSession(mode){                      /* fade out -> reset the whole session (reload) -> mode is restored on load */
@@ -1106,14 +1882,19 @@ function restartSession(mode){                      /* fade out -> reset the who
 }
 const nextOrder=()=>restartSession(currentGameMode);   /* "Нове замовлення" after a finished pizza: same mode, new order modal */
 const exitToMenu=()=>restartSession(null);              /* "В меню": back to the start screen */
+function applyMode(m){if(m==='custom'||(m==='focus'&&nsFocus())){S.ns=true;S.size='K';S.panType=null;S.hasCheeseRim=false;refresh();panel()}}   /* «Нестандартні піци»: only TECH_NS orders, pan view from the first step */
 function startGame(m){
- if(currentGameMode||!ACTIVE_MODES.includes(m))return;currentGameMode=m;modeStore.set(m);const sc=$('#startScr');sc.classList.add('out');
+ if(!ACTIVE_MODES.includes(m))return;
+ if(currentGameMode){if(getComputedStyle($('#startScr')).display!=='none'&&!$('#startScr').classList.contains('out')){focusStore.set(null);restartSession(m)}return}   /* stale session mode + visible menu: restart cleanly in the clicked mode */
+ currentGameMode=m;modeStore.set(m);applyMode(m);const sc=$('#startScr');sc.classList.add('out');
  setTimeout(()=>{sc.style.display='none';RECIPES_READY.then(showOrder)},520);
 }
 document.querySelectorAll('#startScr [data-mode]').forEach(b=>b.addEventListener('click',()=>startGame(b.dataset.mode)));
 $('#exitBtn').addEventListener('click',exitToMenu);
 refresh();panel();
-if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();FOCUS=focusStore.get();RECIPES_READY.then(showOrder)}   /* training continues in the selected mode: new order right after the reload */
+if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();FOCUS=focusStore.get();applyMode(currentGameMode);RECIPES_READY.then(showOrder)}   /* training continues in the selected mode: new order right after the reload */
 </script>
 </body>
 </html>
+
+</body></html>
