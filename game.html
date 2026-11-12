@@ -11,7 +11,7 @@
 /* shared registry + versioned state helpers (inlined in index.html; no separate file) */
 (function (root) {
   'use strict';
-  const PC = { schema: 2, version: '2026.11.12' };
+  const PC = { schema: 3, version: '2026.11.14' };
 
   /* ---- categories: phase = before (pre) or after (post) the oven ---- */
   PC.categories = [
@@ -158,6 +158,78 @@
     return out;
   };
 
+
+  /* ---- graphics (per format) + product book (global): only user overrides are stored ----
+     gfx : { fmtKey: { ingredientId: { n: pieces at the start weight, s: sprite scale %, p: placement pattern } } }
+     book: { id: { off:1 (hidden everywhere), n:'display name', cat:'category id', nf:['k_pizza',...] (formats where it is hidden) } } */
+  PC.fmtKeys = ['std', 'cupcakes', 'sandwich', 'k_pizza'];
+  PC.fmtOfCm = cm => ({ 101: 'k_pizza', 102: 'cupcakes', 103: 'sandwich' })[Number(cm)] || 'std';
+  PC.patterns = { auto: 'Авто (як у грі)', row: 'Рівномірний ряд / лінія', rand: 'Хаотичний розкид', grid: 'Сітка / шахматка', slot: 'Фіксовані слоти' };
+  PC._orig = {};
+  PC.ingredients.forEach(i => { PC._orig[i.id] = { n: i.n, cat: i.cat }; });
+  Object.keys(PC.baseSauces).forEach(k => { PC._orig[k] = { n: PC.baseSauces[k].n, cat: 'base' }; });
+  PC.sanitizeGfx = function (g) {
+    const out = {};
+    Object.entries(g || {}).forEach(([fk, o]) => {
+      if (!PC.fmtKeys.includes(fk) || !o || typeof o !== 'object') return;
+      Object.entries(o).forEach(([id, v]) => {
+        const it = byId[id];
+        if (!it || it.cat === 'sauce' || !v || typeof v !== 'object') return;
+        const r = {}, n = Math.round(Number(v.n)), s = Math.round(Number(v.s));
+        if (n >= 1 && n <= 500) r.n = n;
+        if (s >= 50 && s <= 150 && s !== 100) r.s = s;
+        if (v.p && PC.patterns[v.p] && v.p !== 'auto') r.p = v.p;
+        if (Object.keys(r).length) (out[fk] = out[fk] || {})[id] = r;
+      });
+    });
+    return out;
+  };
+  /* manual coordinates: { fmtKey: { ingredientId: [ { x, y, r (deg), s (scale, 1 = normal) }, ... ] } } in the 320x320 canvas units of the simulator */
+  PC.sanitizePos = function (p) {
+    const out = {}, num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    Object.entries(p || {}).forEach(([fk, o]) => {
+      if (!PC.fmtKeys.includes(fk) || !o || typeof o !== 'object') return;
+      Object.entries(o).forEach(([id, a]) => {
+        const it = byId[id];
+        if (!it || it.cat === 'sauce' || !Array.isArray(a)) return;
+        const arr = a.slice(0, 400).map(q => {
+          if (!q || typeof q !== 'object') return null;
+          const x = num(q.x, NaN), y = num(q.y, NaN);
+          if (!(x >= -40 && x <= 360 && y >= -40 && y <= 360)) return null;
+          const r = Math.round((((num(q.r, 0) % 360) + 360) % 360) * 10) / 10, s = Math.round(Math.max(.3, Math.min(3, num(q.s, 1))) * 100) / 100;
+          const o2 = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, r };
+          if (s !== 1) o2.s = s;
+          return o2;
+        }).filter(Boolean);
+        if (arr.length) (out[fk] = out[fk] || {})[id] = arr;
+      });
+    });
+    return out;
+  };
+  PC.sanitizeBook = function (b) {
+    const out = {};
+    Object.entries(b || {}).forEach(([id, v]) => {
+      const o = PC._orig[id];
+      if (!o || !v || typeof v !== 'object') return;
+      const r = {};
+      if (v.off) r.off = 1;
+      const nm = typeof v.n === 'string' ? v.n.trim().slice(0, 60) : '';
+      if (nm && nm !== o.n) r.n = nm;
+      const oc = PC.cat(o.cat), nc = PC.cat(v.cat);
+      if (v.cat && v.cat !== o.cat && nc && oc && nc.phase === oc.phase && nc.phase === 'pre') r.cat = v.cat;   /* only before-oven ingredients can move between meat / cheese / veg */
+      const nf = Array.isArray(v.nf) ? PC.fmtKeys.filter(k => v.nf.includes(k)) : [];
+      if (nf.length) r.nf = nf;
+      if (Object.keys(r).length) out[id] = r;
+    });
+    return out;
+  };
+  /* writes names / categories from the book into the live registry (registry defaults come back for anything not overridden) */
+  PC.applyBook = function (book) {
+    PC.ingredients.forEach(i => { const o = PC._orig[i.id], b = book && book[i.id]; i.n = (b && b.n) || o.n; i.cat = (b && b.cat) || o.cat; });
+    Object.keys(PC.baseSauces).forEach(k => { const b = book && book[k]; PC.baseSauces[k].n = (b && b.n) || PC._orig[k].n; });
+  };
+  PC.visible = (book, id, fk) => { const b = book && book[id]; return !(b && (b.off || (b.nf && b.nf.includes(fk)))); };
+
   /* ================= shared persistent state (versioned, merged with the registry on every read) =================
      { schema, rev, registryVersion, std:{name:{25,30,35}}, ns:{fmt:{name:tk}}, created:{key:ts}, start:{w:{cm:{id:g}}, dough:{cm:g}} } */
   const KEY = 'pizzaStudio.config', LEGACY = ['pizza_simulator_recipes', 'pizza_simulator_recipes_ns', 'pizza_admin_created', 'pizza_admin_start'];
@@ -172,7 +244,8 @@
     const st = { schema: PC.schema, fromSchema: Number(o.schema) || 1, rev: Number(o.rev) || 0, registryVersion: o.registryVersion || null,
       std: o.std && typeof o.std === 'object' ? o.std : null, ns: o.ns && typeof o.ns === 'object' ? o.ns : null,
       created: o.created && typeof o.created === 'object' ? o.created : {},
-      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough), step: PC.sanitizeStart(o.start && o.start.step) } };
+      start: { w: PC.sanitizeStart(o.start && o.start.w), dough: PC.sanitizeDough(o.start && o.start.dough), step: PC.sanitizeStart(o.start && o.start.step) },
+      gfx: PC.sanitizeGfx(o.gfx), book: PC.sanitizeBook(o.book), pos: PC.sanitizePos(o.pos) };
     return st;
   };
   PC.migrateLegacy = function () {
@@ -183,7 +256,8 @@
   };
   PC.saveState = function (state) {
     const o = { schema: PC.schema, rev: Date.now(), registryVersion: PC.version, std: state.std, ns: state.ns, created: state.created || {},
-      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough), step: PC.sanitizeStart(state.start && state.start.step) } };
+      start: { w: PC.sanitizeStart(state.start && state.start.w), dough: PC.sanitizeDough(state.start && state.start.dough), step: PC.sanitizeStart(state.start && state.start.step) },
+      gfx: PC.sanitizeGfx(state.gfx), book: PC.sanitizeBook(state.book), pos: PC.sanitizePos(state.pos) };
     const ok = store.set(KEY, JSON.stringify(o));
     PC._lastRev = o.rev;
     try { if (PC._bc) PC._bc.postMessage({ type: 'config', rev: o.rev }); } catch (e) {}
@@ -291,6 +365,7 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
 #exitBtn:hover{color:#fff;border-color:rgba(255,138,42,.7);background:rgba(255,138,42,.18)}
 /* ---- start screen ---- */
 .sr-row{display:flex;flex-direction:row;gap:12px;width:100%;max-width:340px;margin-top:20px}.sr-row button{flex:1;min-height:56px;padding:10px 12px;border-radius:16px;font:inherit;font-size:.9rem;font-weight:800;line-height:1.2;cursor:pointer;transition:transform .15s,background .15s,border-color .15s}.sr-row button:active{transform:scale(.97)}.sr-pri{color:#fff;border:1px solid #fb923c;background:linear-gradient(160deg,#fb7c1f,#f97316);box-shadow:0 8px 22px rgba(249,115,22,.35)}.sr-pri:hover{background:#ff8a2a}.sr-sec{color:#fff;border:1.5px solid #3b82f6;background:#1e293b}.sr-sec:hover{background:#273449;border-color:#60a5fa}
+#cfgBadge{position:absolute;left:12px;bottom:10px;z-index:5;max-width:calc(100% - 24px);font-size:10.5px;font-weight:700;color:#cbd5e1;background:rgba(15,23,42,.88);border:1px solid rgba(255,255,255,.16);border-radius:99px;padding:5px 6px 5px 12px;display:flex;align-items:center;gap:8px}#cfgBadge button{border:0;border-radius:99px;background:#ff7a18;color:#1a0f05;font:inherit;font-weight:800;padding:3px 10px;cursor:pointer}
 #doneM{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(5,8,14,.78);backdrop-filter:blur(8px)}
 #doneM.on{display:flex;animation:dmIn .3s ease both}
 @keyframes dmIn{from{opacity:0}to{opacity:1}}
@@ -446,11 +521,13 @@ body{animation:pgIn .4s ease both}@keyframes pgIn{from{opacity:0}to{opacity:1}}
 const PC=window.PIZZA_CONFIG;   /* single source of truth: ingredients / categories / sizes / start weights */
 const $=s=>document.querySelector(s),NS='http://www.w3.org/2000/svg',wait=ms=>new Promise(r=>setTimeout(r,ms));
 /* ---- 1) admin dashboard sync: recipes.json is requested first thing; missing / broken file or timeout -> built-in defaults ---- */
+/* ---- configuration source: ./recipes.json (always re-fetched, cache-busted) -> admin overrides saved in THIS browser's localStorage on top -> built-in defaults only if the file is unavailable ---- */
+let FILE_CFG=null,CFG_SRC='builtin';
 const RECIPES_READY=Promise.race([
- (/^file:/.test(document.baseURI)?Promise.reject(new Error('file://')):fetch('recipes.json',{cache:'no-store'})).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{applyRecipes(d);return true}),
- new Promise(r=>setTimeout(()=>r(false),2500))
-]).catch(()=>false).then(r=>{try{applyStore(PC.loadState())}catch(e){console.warn('shared config',e)}return r});   /* always resolves: game start / first order wait for it */
-PC.subscribe(st=>RECIPES_READY.then(()=>applyStore(st,true)),'sim');   /* admin saved a TK / start weight in another tab: picked up without reloading */
+ (/^file:/.test(document.baseURI)?Promise.reject(new Error('file://')):fetch('./recipes.json?t='+Date.now(),{cache:'no-store'})).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{if(!applyFile(d))throw new Error('empty config');CFG_SRC='file';return true}),
+ new Promise(r=>setTimeout(()=>r(false),4000))
+]).catch(e=>{console.info('recipes.json not used ->',e&&e.message||e);return false}).then(r=>{let st=null;try{st=PC.loadState();applyStore(st)}catch(e){console.warn('shared config',e)}try{if(!window.PZ_PREVIEW)cfgBadge(st)}catch(e){}return r});   /* always resolves: game start / first order wait for it */
+if(!window.PZ_PREVIEW)PC.subscribe(st=>RECIPES_READY.then(()=>applyStore(st,true)),'sim');   /* admin saved a TK / start weight in another tab: picked up without reloading */
 const cleanName=n=>String(n).replace(/\s*\((?:кубик|слайс|пластин|шматоч|кільц|півкільц|стружк)[^)]*\)/gi,'').replace(/\s+(?:кубиком|кубиками|слайсами|пластинками|шматочками|кільцями|півкільцями|стружкою|соломкою)(?![а-яіїєґ])/gi,'').replace(/\s*\(?(?:хвиляста|спіральна) лінія\)?/gi,'').replace(/\s{2,}/g,' ').trim();   /* product names carry no cut form / sauce style */
 function adminToTech(tk){   /* native dashboard format (ings / post arrays, pat string) -> tech card; null = incomplete */
  if(!tk||!Array.isArray(tk.ings))return tk;
@@ -467,15 +544,51 @@ function adminToTech(tk){   /* native dashboard format (ings / post arrays, pat 
 /* the shared state saved by the admin (same origin) is authoritative: TK base + start weights + dough weights, merged with the registry defaults */
 /* a new registry ingredient without its own picture is drawn as a generic piece (colour from the registry) */
 function ensureSprites(){[...ING,...POST].forEach(i=>{if(!SH[i.id]){const c=(PC.ing(i.id)||{}).color||'#c9a063';SH[i.id]=k=>`<circle r="${(4+((k||0)%3)*.6).toFixed(1)}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`}})}
+function normFile(d){   /* unified schema (recipes / startingWeights / steps / visualSettings / ingredientCatalog / manualCoordinates) or any older export */
+ if(!d||typeof d!=='object'||Array.isArray(d))return null;
+ const r=d.recipes&&typeof d.recipes==='object'?d.recipes:null,sw=d.startingWeights&&typeof d.startingWeights==='object'?d.startingWeights:null,sz={};
+ if(sw)Object.entries(sw.dough||{}).forEach(([cm,g])=>{const k=PC.sizeKey[cm];if(k&&+g>0)sz[k]={g:+g}});
+ return{TECH:(r&&r.TECH)||d.TECH,TECH_NS:(r&&r.TECH_NS)||d.TECH_NS,START_W:(sw&&sw.weights)||d.START_W,STEP_W:d.steps||d.STEP_W,SIZES:sw?sz:d.SIZES,GFX:d.visualSettings||d.GFX,BOOK:d.ingredientCatalog||d.BOOK,POS:d.manualCoordinates||d.POS};
+}
+function applyFile(d){   /* the published file is the base: its recipes REPLACE the built-in ones, then the weights / graphics / catalog / coordinates */
+ const o=normFile(d);if(!o)return false;
+ const keys=['TECH','TECH_NS','START_W','STEP_W','SIZES','GFX','BOOK','POS'];
+ if(!keys.some(k=>o[k]&&typeof o[k]==='object'&&Object.keys(o[k]).length)&&!d.recipes&&!d.META){applyRecipes(d);return Object.keys(TECH).length>0}   /* a bare TECH object (oldest format) */
+ const bakT={...TECH},bakN={...TECH_NS};
+ if(o.TECH)Object.keys(TECH).forEach(k=>delete TECH[k]);
+ if(o.TECH_NS)Object.keys(TECH_NS).forEach(k=>delete TECH_NS[k]);
+ if(o.START_W)Object.keys(START_W).forEach(k=>delete START_W[k]);
+ if(o.STEP_W)Object.keys(STEP_W).forEach(k=>delete STEP_W[k]);
+ if(o.SIZES)Object.keys(PC.sizes).forEach(k=>{SIZES[k].g=PC.sizes[k].g});
+ applyRecipes(o);
+ if(!Object.keys(TECH).length)Object.assign(TECH,bakT);   /* a broken file never leaves the game without recipes */
+ if(!Object.keys(TECH_NS).length)Object.assign(TECH_NS,bakN);
+ ORDER_CATALOG[0].names=Object.keys(TECH);
+ FILE_CFG=o;return true;
+}
+function cfgBadge(st){   /* a clear indicator when this browser's own admin overrides sit on top of / replace recipes.json */
+ const has=st&&(st.std||st.ns||Object.keys(st.start.w||{}).length||Object.keys(st.start.step||{}).length||Object.keys(st.start.dough||{}).length||Object.keys(st.gfx||{}).length||Object.keys(st.book||{}).length||Object.keys(st.pos||{}).length);
+ if(!has&&CFG_SRC==='file')return;
+ const b=document.createElement('div');b.id='cfgBadge';
+ b.innerHTML=has?'⚙ Локальні налаштування адміна поверх recipes.json <button type="button">Скинути</button>':'Вбудовані налаштування (recipes.json недоступний)';
+ const x=b.querySelector('button');if(x)x.onclick=()=>{try{localStorage.removeItem(PC.KEY)}catch(e){}location.reload()};
+ $('#startScr').appendChild(b);
+}
+function applyBookGfx(g,b,p){
+ GFX=PC.sanitizeGfx(g);BOOK=PC.sanitizeBook(b);POS=PC.sanitizePos(p);PC.applyBook(BOOK);
+ ING.forEach(i=>{i.n=PC.nameOf(i.id);i.cat=PC.catOf(i.id)});[...POST,...TOPS].forEach(i=>{i.n=PC.nameOf(i.id)});Object.keys(SAUCES).forEach(k=>{if(PC.baseSauces[k])SAUCES[k].n=PC.baseSauces[k].n});LAY_CACHE.clear();
+}
 function applyStore(st,live){
  ensureSprites();
  if(!st)return;
+ {const F=FILE_CFG||{},pk=(a,b)=>Object.keys(a||{}).length?a:b;applyBookGfx(pk(st.gfx,F.GFX),pk(st.book,F.BOOK),pk(st.pos,F.POS))}   /* names / categories / visibility / graphics from the admin */
  const bakT={...TECH},bakN={...TECH_NS};
  if(st.std)Object.keys(TECH).forEach(k=>delete TECH[k]);
  if(st.ns)Object.keys(TECH_NS).forEach(k=>delete TECH_NS[k]);
- Object.keys(START_W).forEach(k=>delete START_W[k]);
- Object.keys(STEP_W).forEach(k=>delete STEP_W[k]);
- Object.keys(PC.sizes).forEach(k=>{SIZES[k].g=PC.sizes[k].g});
+ const has=o=>Object.keys(o||{}).length;
+ if(has(st.start.w))Object.keys(START_W).forEach(k=>delete START_W[k]);
+ if(has(st.start.step))Object.keys(STEP_W).forEach(k=>delete STEP_W[k]);
+ if(has(st.start.dough)||!FILE_CFG)Object.keys(PC.sizes).forEach(k=>{SIZES[k].g=PC.sizes[k].g});
  const sz={};Object.entries(st.start.dough||{}).forEach(([cm,g])=>{const k=PC.sizeKey[cm];if(k)sz[k]={g}});
  applyRecipes({TECH:st.std||undefined,TECH_NS:st.ns?PC.nsToByName(st.ns):undefined,START_W:st.start.w,STEP_W:st.start.step,SIZES:sz});
  if(!Object.keys(TECH).length)Object.assign(TECH,bakT);   /* an empty / broken base never leaves the game without recipes */
@@ -485,7 +598,8 @@ function applyStore(st,live){
 }
 function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PPG} or a bare TECH object */
  if(!d||typeof d!=='object')return;
- const known=['TECH','TECH_NS','SAUCES','SIZES','ING','POST','TOPS','PPG'],T=d.TECH||(known.some(k=>k in d)?null:d);
+ if(d.GFX||d.BOOK||d.POS)applyBookGfx(d.GFX,d.BOOK,d.POS);   /* recipes.json exchange path */
+ const known=['TECH','TECH_NS','SAUCES','SIZES','ING','POST','TOPS','PPG','GFX','BOOK','POS'],T=d.TECH||(known.some(k=>k in d)?null:d);
  const okTK=tk=>{if(!tk||typeof tk!=='object')return false;const num=v=>typeof v==='number'&&isFinite(v)&&v>=0,post=tk.post||(tk.herbs!==undefined?{spi:tk.herbs}:{}),
   ing=Object.keys(tk).filter(k=>!['total','sauce','sauceId','herbs','layers','post','pat','rim','hasCheeseRim'].includes(k));
   return num(tk.total)&&tk.total>0&&num(tk.sauce)&&ing.length>0&&(!tk.sauceId||!!SAUCES[tk.sauceId])&&ing.every(k=>num(tk[k])&&ING.some(i=>i.id===k))&&Object.values(post).every(num)&&Object.keys(post).every(k=>POST.some(p=>p.id===k)||TOPS.some(t=>t.id===k))&&tk.total>Object.values(post).reduce((a,b)=>a+b,0)};   /* no NaN / negative / incomplete tech cards reach the weight math */
@@ -498,7 +612,8 @@ function applyRecipes(d){   /* accepts {TECH:{...},SAUCES,SIZES,ING,POST,TOPS,PP
  byId(ING,d.ING);byId(POST,d.POST);byId(TOPS,d.TOPS);[ING,POST,TOPS].forEach(a=>a.forEach(i=>{i.n=cleanName(i.n)}));
  ORDER_CATALOG[0].names=Object.keys(TECH);   /* order generator follows the dashboard catalog */
 }
-const rnd=s=>{s=Math.sin(s*127.1+311.7)*43758.5453;return s-Math.floor(s)};
+let PV_SEED=0;   /* admin live preview re-roll offset (0 in the game) */
+const rnd=s=>{s=Math.sin((s+PV_SEED)*127.1+311.7)*43758.5453;return s-Math.floor(s)};
 const SIZES=JSON.parse(JSON.stringify(PC.sizes));   /* S/M/L = 25/30/35 cm, K / C / W = non-standard formats (cm 101 / 102 / 103 are format ids, not centimetres) */
 const szT=cm=>cm>100?(Object.values(SIZES).find(z=>z.cm===cm)||{}).n||String(cm):cm+' см';
 const SAUCES=JSON.parse(JSON.stringify(PC.baseSauces));
@@ -606,6 +721,7 @@ const DEV_WARN=.1;   /* |deviation| <= 10% -> amber, above -> red, exact -> gree
    FINAL  = BAKED + post-bake herbs  (Margarita 25 cm: 314 + 1 = 315 g, 0 g deviation) */
 /* NON-STANDARD recipes: their own table, never mixed with TECH (round pizzas). Key = name -> format id (101 = К-Піца, 102 = Піца Капкейки). Values are placeholders until real tech cards arrive (dashboard JSON key TECH_NS). */
 const STEP_W={},stepW=(id,d,cm)=>{const o=STEP_W[cm??SIZES[S.size].cm],v=o&&o[id];return v>0?v:d};   /* per-format +/- step (g) from the dashboard */
+let GFX={},BOOK={},POS={},PV_NOPOS=false;   /* «Налаштування графіки» / «Довідник продуктів» saved by the admin */
 const START_W={},startW=(id,d,cm)=>{const o=START_W[cm??SIZES[S.size].cm],v=o&&o[id];return v>0?v:d};   /* per-format start weights from the dashboard tab «Зміна стартової ваги» (key = cm 25/30/35 or format id 101/102/103); missing -> built-in defaults */
 const TECH_NS={   /* 101 = К-Піца, 102 = Піца Капкейки, 103 = Піца-сендвіч. Each format has its OWN short menu (recipesByFormat below) - nothing is cloned from the round-pizza catalog */
  'Маргарита':{101:{total:303,sauce:60,moz:100,tom:40,post:{spi:1}},103:{total:361,sauce:60,moz:100,tom:40,post:{spi:1}}},
@@ -673,16 +789,92 @@ function undo(){
  refresh();panel();
 }
 document.addEventListener('DOMContentLoaded',()=>$('#undo').addEventListener('click',undo));
+/* ---- admin «Налаштування графіки»: piece count / sprite scale / placement pattern per format and ingredient ---- */
+const curFmt=()=>S.ns?(S.panType||'k_pizza'):'std',
+ gOv=id=>(GFX[curFmt()]||{})[id]||null,
+ gScale=id=>{const o=gOv(id);return o&&o.s?o.s/100:1},
+ visIng=i=>PC.visible(BOOK,i.id,curFmt()),
+ catVis=k=>k==='gr'?POST.some(visIng):k==='sauce'?TOPS.some(visIng):ING.some(i=>i.cat===k&&visIng(i)),
+ sauceList=()=>{const a=Object.entries(SAUCES).filter(([k])=>PC.visible(BOOK,k,curFmt()));return a.length?a:Object.entries(SAUCES)};
+function gfxDomain(it,sc,fk){
+ const ex=Math.min(EX[it.id]||8,13)*sc*.8;
+ if(fk==='k_pizza'){const PX=Math.max(ex,K_PAD_X),PY=Math.max(ex,K_PAD_Y);return{cx:KF.x+KF.w/2,cy:KF.y+KF.h/2,hw:KF.w/2-PX,hh:KF.h/2-PY,disc:false}}
+ if(fk==='sandwich')return{cx:160,cy:SW_GY,hw:SW_RIN*.78,hh:SW_RIN*.42,disc:false};
+ const R=maxR(it.id);return{cx:160,cy:160,hw:R,hh:R,disc:true};
+}
+function gfxPattern(it,n,j,pat,sc,fk){
+ const D=gfxDomain(it,sc,fk),ex=Math.max(3,(EX[it.id]||8)*sc),out=[],sd0=ALL.indexOf(it.id)*13+j*7,P=(x,y,r=0)=>{if(D.disc){const d=Math.hypot(x,y);if(d>D.hw){x*=D.hw/d;y*=D.hw/d}}else{x=Math.max(-D.hw,Math.min(D.hw,x));y=Math.max(-D.hh,Math.min(D.hh,y))}return{x:D.cx+x,y:D.cy+y,r}},
+  inside=(x,y)=>D.disc?Math.hypot(x,y)<=D.hw+.01:(Math.abs(x)<=D.hw+.01&&Math.abs(y)<=D.hh+.01);
+ if(n<=0)return out;
+ if(pat==='row'){
+  const per=Math.max(1,Math.floor(2*D.hw/Math.max(ex*1.7,6))),rows=Math.max(1,Math.ceil(n/per)),base=Math.floor(n/rows),extra=n%rows;
+  for(let r=0;r<rows;r++){const m=base+(r<extra?1:0),y=rows===1?0:(r/(rows-1)-.5)*2*D.hh*.8,half=D.disc?Math.sqrt(Math.max(0,D.hw*D.hw-y*y))*.92:D.hw;
+   for(let k=0;k<m;k++)out.push(P(m===1?0:(k/(m-1)-.5)*2*half,y))}
+ }else if(pat==='grid'){
+  const cntAt=d=>{let c=0;const K=Math.ceil(D.hw/d)+2;for(let ry=-K;ry<=K;ry++)for(let kx=-K;kx<=K;kx++){const x=kx*d+(ry&1?d/2:0),y=ry*d*.866;if(inside(x,y))c++}return c};
+  let lo=2,hi=Math.max(D.hw,D.hh)*2;for(let i=0;i<24;i++){const m=(lo+hi)/2;if(cntAt(m)>=n)lo=m;else hi=m}
+  const d=lo,K=Math.ceil(D.hw/d)+2,sh=(j%3)*d/3,pts=[];
+  for(let ry=-K;ry<=K;ry++)for(let kx=-K;kx<=K;kx++){let x=kx*d+(ry&1?d/2:0),y=ry*d*.866;if(inside(x,y))pts.push([x,y])}
+  const c0=pts.reduce((a,q)=>[a[0]+q[0]/pts.length,a[1]+q[1]/pts.length],[0,0]);
+  pts.sort((a,b)=>Math.hypot(a[0]-c0[0],a[1]-c0[1])-Math.hypot(b[0]-c0[0],b[1]-c0[1])).slice(0,n).forEach(q=>out.push(P(q[0]-c0[0]+(sh&&inside(q[0]-c0[0]+sh,q[1]-c0[1])?sh*.4:0),q[1]-c0[1])));
+ }else if(pat==='rand'){
+  let md=ex*1.4;
+  for(let i=0;i<n;i++){let best=null,bd=-1;
+   for(let t=0;t<40;t++){const u=rnd(sd0+i*3.7+t*.31),v=rnd(sd0+i*5.1+t*.57+.5);let x,y;
+    if(D.disc){const r=D.hw*Math.sqrt(u),a=6.2832*v;x=r*Math.cos(a);y=r*Math.sin(a)}else{x=(u*2-1)*D.hw;y=(v*2-1)*D.hh}
+    const dm=out.reduce((m,q)=>Math.min(m,Math.hypot(q.x-D.cx-x,q.y-D.cy-y)),1e9);if(dm>=md){best=[x,y];break}if(dm>bd){bd=dm;best=[x,y]}}
+   out.push(P(best[0],best[1],rnd(sd0+i*7.3)*360));if(i%12===11)md*=.85}
+ }else{   /* slot: centre, then rings of 6 / 12 / 18 ... at fixed positions */
+  out.push(P(0,0));let ring=1;
+  while(out.length<n){const size=6*ring,m=Math.min(size,n-out.length),rr=Math.min(1,ring*.4),rot=(j%2?.5:0)*2*Math.PI/size;
+   for(let i=0;i<m;i++){const a=-Math.PI/2+rot+2*Math.PI*Math.floor(i*size/m)/size;out.push(P(D.hw*rr*Math.cos(a),D.hh*rr*Math.sin(a)))}ring++}
+  out.length=n;
+ }
+ return out;
+}
+const posOv=id=>{if(PV_NOPOS)return null;const a=(POS[curFmt()]||{})[id];return a&&a.length?a:null};   /* manual coordinates saved in the admin «Ручне позиціонування» */
+function clampFmt(it,x,y,sc,fk){   /* keeps a piece centre strictly inside the dough of the format */
+ const ex=Math.min(EX[it.id]||8,13),cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+ if(fk==='k_pizza'){const rad=ex*sc*.8,PX=Math.max(rad,K_PAD_X),PY=Math.max(rad,K_PAD_Y);return[cl(x,KF.x+PX,KF.x+KF.w-PX),cl(y,KF.y+PY,KF.y+KF.h-PY)]}
+ if(fk==='sandwich')return swFit(x,y,(it.id==='ched'?18:ex*.8)*sc);
+ if(fk==='cupcakes'){let b=WELLS[0],bd=1e9;WELLS.forEach(w=>{const d=Math.hypot(x-w[0],y-w[1]);if(d<bd){bd=d;b=w}});const R=Math.max(6,30-ex*sc*.4),dx=x-b[0],dy=y-b[1],d=Math.hypot(dx,dy);return d>R?[b[0]+dx*R/d,b[1]+dy*R/d]:[x,y]}
+ const R=maxR(it.id),dx=x-160,dy=y-160,d=Math.hypot(dx,dy);return d>R?[160+dx*R/d,160+dy*R/d]:[x,y];
+}
+function manualPos(it,n,j){   /* saved coordinates first (exact); extra pieces / extra layers: small deterministic offset from the saved ones */
+ const A=posOv(it.id),L=A.length,sc=gScale(it.id),fk=curFmt(),out=[],ix=ALL.indexOf(it.id);
+ for(let k=0;k<n;k++){
+  const q=A[k%L],ring=Math.floor(k/L)+j;
+  if(!ring){out.push({x:q.x,y:q.y,r:q.r||0,s:(q.s||1)*sc});continue}
+  const a=rnd(ix*17+k*3.7+j*5.1)*6.2832,d=(2.6+1.4*Math.min(ring,4))*(.8+.4*rnd(k*1.3+ix)),[x,y]=clampFmt(it,q.x+d*Math.cos(a),q.y+d*Math.sin(a),(q.s||1)*sc,fk);
+  out.push({x,y,r:(q.r||0)+(rnd(k*2.9+ix+j)-.5)*50,s:(q.s||1)*sc});
+ }
+ return out;
+}
+function gfxPost(it,n,j,P0){
+ const o=gOv(it.id);if(!o||!P0.length)return P0;
+ const fk=curFmt(),sc=gScale(it.id);let Q=P0;
+ if(o.p&&fk!=='cupcakes'&&it.id!=='ched')Q=gfxPattern(it,P0.length,j,o.p,sc,fk)||P0;
+ if(sc===1&&Q===P0)return P0;
+ Q=Q.map(p=>({...p,s:(p.s||1)*sc}));
+ if(sc>1||Q!==P0){
+  if(fk==='sandwich'){const m=(it.id==='ched'?18:Math.min(EX[it.id]||8,13)*.8)*sc;Q.forEach(p=>{[p.x,p.y]=swFit(p.x,p.y,m)})}
+  else if(fk==='k_pizza'&&it.id!=='ched'){const rad=Math.min(EX[it.id]||8,13)*(P0[0]&&P0[0].s||1)*sc*.8,PX=Math.max(rad,K_PAD_X),PY=Math.max(rad,K_PAD_Y);Q.forEach(p=>{p.x=Math.max(KF.x+PX,Math.min(KF.x+KF.w-PX,p.x));p.y=Math.max(KF.y+PY,Math.min(KF.y+KF.h-PY,p.y))})}
+ }
+ return Q;
+}
 /* ---- placement engine: every ingredient type is its own independent layer ---- */
 const EX={sal:14,hun:8,chk:8,chi:8,cor:5,oni:10,pin:6,cuc:10,blu:8,mix:7,ice:10,spi:3,aru:8,gon:4,pep:12,shy:14,bac:17,bal:16,moz:4,ched:25.8,tom:5.5,bel:5.5,oli:5.8,mas:5.8,mus:9.5};   /* half-extent of a piece (fixed real-world size; 8.571 units = 1 cm) */
 const FP={sal:28,hun:16,chk:18,chi:15,oni:22,pin:12,cuc:20,blu:17,ice:22,aru:18,pep:24,shy:30,bac:36,bal:34,moz:8.5,ched:56,tom:12,bel:12,oli:12,mas:12,mus:20};
 const RAD=new Set(['bac','bal']),PH={bal:.25};RAD.forEach(id=>{FP[id]=FP.pep});   /* fixed per-id angular phase (fraction of one slot step): same grams -> pieces alternate between each other, never stack */   /* bacon / balyk / hunting sausages use pepperoni's exact slots() spacing params; posFor() default path = same function, per-layer rotation by ALL.indexOf(id) keeps layers independent */
 const BULK=new Set(['cor','mix','spi','gon','aru']),U=8.571,ALL=[...ING,...POST].map(i=>i.id);
 /* sauce disc radius (units) for the current base; a piece (centre + half extent) must stay strictly inside it, never touching the crust */
-const RIMG=cm=>cm===35?100:70,rimNow=()=>S.hasCheeseRim?RIMG(SIZES[S.size].cm):0,rimD=()=>S.hasCheeseRim?6:0,sauceR=()=>S.ns?100:(131-rimD())*SIZES[S.size].cm/35,maxR=id=>sauceR()-EX[id]-(RAD.has(id)?2:5);
+const RIMG=cm=>cm===35?100:70,rimNow=()=>S.hasCheeseRim?RIMG(SIZES[S.size].cm):0,rimD=()=>S.hasCheeseRim?6:0,sauceR=()=>S.ns?100:(131-rimD())*SIZES[S.size].cm/35,maxR=id=>sauceR()-EX[id]*gScale(id)-(RAD.has(id)?2:5);
 const fg=v=>String(+(+v).toFixed(1)),MAXG=it=>it.cat==='che'?160:120,baseR=()=>SIZES[S.size].cm*U/2,nsF=it=>S.ns?(S.panType==='sandwich'?(it.id==='pin'?1.5:1):S.panType==='cupcakes'?(it.cat==='meat'?3:it.cat==='veg'?1.5:1.2):.5):1,nsMin=g=>S.ns&&g>0?(S.panType==='cupcakes'?6:1):0,kCount=(it,g)=>{if(g<=0)return 0;const id=it.id;let n;   /* К-Піца piece counts per portion (scaled by weight) */
   if(id==='ched')n=Math.round(g/12.5);else if(id==='chi')n=Math.round(8*g/5);else if(['pep','sal','shy','bac','bal'].includes(id))n=Math.round(8*g/20);else if(['cuc','oli','mas'].includes(id))n=Math.round(10*g/20);
-  else n=Math.round(g*it.pp/10*VK(id)*.5)*({moz:2,mix:2,tom:2,bel:2,oni:2,pin:3}[id]||1);return Math.max(1,n)},SLICED=new Set(['pep','sal','shy','bac','bal','ched']),FIVE=new Set(['hun','chk']),KEEP=new Set(['chi','cuc','oli']),cupN=(it,g)=>g>0?6*(SLICED.has(it.id)?Math.max(1,Math.ceil(g/30)):FIVE.has(it.id)?5:it.id==='blu'?3:it.cat==='che'?(g>=40?20:18):it.cat==='veg'&&!KEEP.has(it.id)?(g>=40?6:5):(g>=40?4:3)):0,cntG=(it,g)=>S.panType==='cupcakes'?cupN(it,g):S.panType==='k_pizza'?kCount(it,g):(S.panType==='sandwich'&&swCnt(it,g))||Math.min(it.max||1e9,Math.max(nsMin(g),Math.round(g*it.pp/10*VK(it.id)*nsF(it)))),lays=id=>{const a=S.stack.filter(l=>l.id===id&&l.g>0);return a.length?a:((S.qty[id]||0)>0?[{id,g:S.qty[id]}]:[])},cnt=it=>it.cat&&S.panType==='cupcakes'?cupN(it,S.qty[it.id]||0):it.cat&&S.panType==='k_pizza'?kCount(it,S.qty[it.id]||0):it.cat&&S.panType==='sandwich'&&swCnt(it,S.qty[it.id]||0)?swCnt(it,S.qty[it.id]||0):it.cat?Math.min(it.max||1e9,Math.max(nsMin(S.qty[it.id]||0),Math.round((S.qty[it.id]||0)*it.pp/10*VK(it.id)*nsF(it)))):(S.post[it.id]?Math.max(1,Math.min(it.max||(it.id==='spi'?1800:900),Math.round(postG(it)*(PPG[it.id]??it.pp/it.g)))):0);
+  else n=Math.round(g*it.pp/10*VK(id)*.5)*({moz:2,mix:2,tom:2,bel:2,oni:2,pin:3}[id]||1);return Math.max(1,n)},SLICED=new Set(['pep','sal','shy','bac','bal','ched']),FIVE=new Set(['hun','chk']),KEEP=new Set(['chi','cuc','oli']),cupN=(it,g)=>g>0?6*(SLICED.has(it.id)?Math.max(1,Math.ceil(g/30)):FIVE.has(it.id)?5:it.id==='blu'?3:it.cat==='che'?(g>=40?20:18):it.cat==='veg'&&!KEEP.has(it.id)?(g>=40?6:5):(g>=40?4:3)):0,cntG0=(it,g)=>S.panType==='cupcakes'?cupN(it,g):S.panType==='k_pizza'?kCount(it,g):(S.panType==='sandwich'&&swCnt(it,g))||Math.min(it.max||1e9,Math.max(nsMin(g),Math.round(g*it.pp/10*VK(it.id)*nsF(it)))),lays=id=>{const a=S.stack.filter(l=>l.id===id&&l.g>0);return a.length?a:((S.qty[id]||0)>0?[{id,g:S.qty[id]}]:[])},cnt0=it=>it.cat&&S.panType==='cupcakes'?cupN(it,S.qty[it.id]||0):it.cat&&S.panType==='k_pizza'?kCount(it,S.qty[it.id]||0):it.cat&&S.panType==='sandwich'&&swCnt(it,S.qty[it.id]||0)?swCnt(it,S.qty[it.id]||0):it.cat?Math.min(it.max||1e9,Math.max(nsMin(S.qty[it.id]||0),Math.round((S.qty[it.id]||0)*it.pp/10*VK(it.id)*nsF(it)))):(S.post[it.id]?Math.max(1,Math.min(it.max||(it.id==='spi'?1800:900),Math.round(postG(it)*(PPG[it.id]??it.pp/it.g)))):0);
+const gfxN=(it,g,n)=>{const pa=posOv(it.id);if(pa&&n&&g>0){const sw=def(it)||g;return Math.max(1,Math.min(it.max||1e9,Math.round(pa.length*g/sw)))}   /* manual coordinates define the base piece count */
+ const o=gOv(it.id);if(!o||!o.n||!n||!(g>0))return n;const sw=def(it)||g;let r=Math.max(1,Math.min(it.max||1e9,Math.round(o.n*g/sw)));if(S.panType==='cupcakes')r=Math.max(6,Math.round(r/6)*6);return r},   /* N pieces for the start weight, further grams scale proportionally */
+ cntG=(it,g)=>gfxN(it,g,cntG0(it,g)),cnt=it=>gfxN(it,it.cat?(S.qty[it.id]||0):(S.post[it.id]?postG(it):0),cnt0(it));
 const fib=(n,R,off)=>[...Array(n)].map((_,i)=>{const r=R*Math.sqrt((i+.5)/n),a=i*2.39996+off;return{x:160+r*Math.cos(a),y:160+r*Math.sin(a),r:rnd(i+off)*360}});
 function slots(N,Ru,fp,f=0,ph=0){
  if(N===1)return[{x:160,y:160,r:0}];
@@ -721,7 +913,7 @@ function mushLayout(n,R,idx){
 /* one layout PER LAYER: j = layer index of this ingredient (0 = first pass). Seeds / phases / rotation derive from j, so every pass scatters over the whole pizza on its own and never touches the pieces of other layers */
 const LAY_CACHE=new Map();
 function posForL(it,n,j){   /* memoised: a layer's slots depend only on (ingredient, count, layer index, pizza size, rim) -> lower layers never recompute */
- const key=it.id+'|'+n+'|'+j+'|'+S.size+'|'+(S.hasCheeseRim?1:0)+'|'+(S.packed?1:0)+(S.panType==='sandwich'?'|m'+swMeatIdx(it):'');let v=LAY_CACHE.get(key);if(!v){v=S.ns?nsPos(it,n,j):posForL0(it,n,j);if(LAY_CACHE.size>800)LAY_CACHE.clear();LAY_CACHE.set(key,v)}return v}
+ const key=it.id+'|'+n+'|'+j+'|'+S.size+'|'+(S.hasCheeseRim?1:0)+'|'+(S.packed?1:0)+(S.panType==='sandwich'?'|m'+swMeatIdx(it):'')+'|'+curFmt()+'|'+JSON.stringify(gOv(it.id)||0)+(posOv(it.id)?'|M':PV_NOPOS?'|N':'');let v=LAY_CACHE.get(key);if(!v){v=posOv(it.id)?manualPos(it,n,j):gfxPost(it,n,j,S.ns?nsPos(it,n,j):posForL0(it,n,j));if(LAY_CACHE.size>800)LAY_CACHE.clear();LAY_CACHE.set(key,v)}return v}
 function posForL0(it,n,j){
  if(!n)return[];const idj=ALL.indexOf(it.id)+j*5.3;
  if(it.id==='mus')return mushLayout(n,maxR('mus')+6,idj);if(it.id==='ched')return chedLayout(n,j);if(it.id==='oli'||it.id==='mas')return oliveLayout(n,it.id==='mas',j);const R=maxR(it.id),idx=idj;
@@ -865,28 +1057,29 @@ function thumb(it){const pos=[[21,23,-20],[43,25,40],[32,44,10]];return `<svg vi
 const tool=(c,k)=>{const W=c==='white';return `<path d="M-7-21L7-21L8-34L-6-34Z" fill="#cdd5df" stroke="#8a95a4" stroke-width="1"/><path d="M-21-32C-14-39-4-41 4-47C11-54 17-64 24-73C27-81 40-87 45-77C47-68 41-56 34-48C29-43 23-40 20-37C18-31 21-26 14-21C9-20 8-24 8-28C0-30-12-29-21-32Z" fill="${W?'#f7f7f4':'#15171c'}" stroke="${W?'#aeb4bf':'#3b3f48'}" stroke-width="1.3" stroke-linejoin="round"/><path d="M8-51C15-59 21-67 27-76" fill="none" stroke="${W?'#fff':'#5a5f6b'}" stroke-width="2.2" stroke-linecap="round" opacity=".55"/><path d="M-14-35C-6-35 2-33 8-31" fill="none" stroke="${W?'#d9dde4':'#2a2d34'}" stroke-width="1.2" opacity=".7"/><g${k?' id="kwheel"':''}><circle r="24" fill="url(#steel)" stroke="#8d98a7" stroke-width="1.6"/><circle r="21.3" fill="none" stroke="#f1f4f8" stroke-width="1.3"/><path d="M0-15A15 15 0 0 1 13-7.5M0 15A15 15 0 0 1-13 7.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><circle r="3.4" fill="#d2d9e2" stroke="#7c8795" stroke-width="1"/><circle cx="-.9" cy="-1" r="1.1" fill="#fff"/></g>`};
 function knife(c){return `<svg viewBox="-28 -102 84 132" width="62" height="98">${tool(c)}</svg>`}
 const swCats=()=>PC.categories.map(c=>[c.id,c.n]);
-function panel(){syncUndo();setTimeout(()=>{if(S.phase==='rim'&&!S.busy&&!S.ns){const b=$('#panel [data-rim="0"]');b&&b.focus({preventScroll:true})}},0);
+function panel(){syncUndo();if(S.phase==='build'&&!catVis(S.cat)){const f=(S.panType==='sandwich'?swCats():CATS).find(([k])=>catVis(k));if(f)S.cat=f[0]}   /* a category with no visible ingredient is skipped */
+ setTimeout(()=>{if(S.phase==='rim'&&!S.busy&&!S.ns){const b=$('#panel [data-rim="0"]');b&&b.focus({preventScroll:true})}},0);
  const p=$('#panel'),keep=p.querySelector('.row')?.scrollLeft||0;
  if(S.phase==='rim'&&S.ns)p.innerHTML=tabsHTML()+`<div class="text-center text-sm font-bold">Оберіть потрібну форму для приготування замовлення</div>`;
  else if(S.phase==='rim')p.innerHTML=tabsHTML()+`<div class="text-center text-sm font-bold">Борт піци <span class="text-slate-400 font-normal">— сирний: ${SIZES[S.size].cm===35?100:70} г крем-сиру</span></div><div class="flex justify-around mt-3"><button class="sauceb" data-rim="0"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="#e6c283"/><circle cx="50" cy="50" r="30" fill="#f4dfb2"/></svg>Звичайний борт</button><button class="sauceb" data-rim="1"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="#efca8a"/><circle cx="50" cy="50" r="36" fill="none" stroke="#fffdf0" stroke-width="7"/><circle cx="50" cy="50" r="26" fill="#f4dfb2"/></svg>Сирний борт</button></div>`;
- else if(S.phase==='sauce')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть соус <span class="text-slate-400 font-normal">— без нього інгредієнти недоступні</span></div><div class="flex justify-around mt-3">${Object.entries(SAUCES).map(([k,s])=>`<button class="sauceb" data-sauce="${k}"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="38" fill="${s.c}"/><ellipse cx="38" cy="38" rx="14" ry="7" fill="#fff" opacity=".2"/></svg>${s.n}</button>`).join('')}</div>`;
+ else if(S.phase==='sauce')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть соус <span class="text-slate-400 font-normal">— без нього інгредієнти недоступні</span></div><div class="flex justify-around mt-3">${sauceList().map(([k,s])=>`<button class="sauceb" data-sauce="${k}"><svg viewBox="0 0 100 100" width="92" height="92"><circle cx="50" cy="50" r="47" fill="#1c2434" stroke="#46526a" stroke-width="3"/><circle cx="50" cy="50" r="38" fill="${s.c}"/><ellipse cx="38" cy="38" rx="14" ry="7" fill="#fff" opacity=".2"/></svg>${s.n}</button>`).join('')}</div>`;
  else if(S.phase==='build'&&S.panType==='sandwich'&&(S.cat==='gr'||S.cat==='sauce')){   /* Піца-сендвіч: spices / greens and topping sauces go in BEFORE the oven */
   const sc=S.cat==='sauce',cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';S.pcat=S.cat;
-  p.innerHTML=`<div class="flex gap-2 overflow-x-auto" style="flex-wrap:nowrap">${swCats().map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
+  p.innerHTML=`<div class="flex gap-2 overflow-x-auto" style="flex-wrap:nowrap">${swCats().filter(([k])=>catVis(k)).map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
   <div class="flex items-center gap-2 mt-2 h-11"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${ps?pn:'Доткніться інгредієнта'}</div><button class="stp" data-pw="${ps||''}" data-d="-1" ${ps?'':'disabled'} aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${ps?pwG(ps):0} г</b><button class="stp" data-pw="${ps||''}" data-d="1" ${ps?'':'disabled'} aria-label="Більше">+</button><button class="bake" data-bake>У піч</button></div>
-  <div class="flex justify-around mt-2">${sc?TOPS.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
- else if(S.phase==='build'){const list=ING.filter(i=>i.cat===S.cat),sel=ING.find(i=>i.id===S.sel),q=sel?S.qty[sel.id]||0:0;
-  p.innerHTML=`<div class="flex gap-2 ${S.panType==='sandwich'?'overflow-x-auto':''}" ${S.panType==='sandwich'?'style="flex-wrap:nowrap"':''}>${(S.panType==='sandwich'?swCats():CATS).map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
+  <div class="flex justify-around mt-2">${sc?TOPS.filter(visIng).map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.filter(visIng).map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
+ else if(S.phase==='build'){const list=ING.filter(i=>i.cat===S.cat&&visIng(i)),sel=ING.find(i=>i.id===S.sel),q=sel?S.qty[sel.id]||0:0;
+  p.innerHTML=`<div class="flex gap-2 ${S.panType==='sandwich'?'overflow-x-auto':''}" ${S.panType==='sandwich'?'style="flex-wrap:nowrap"':''}>${(S.panType==='sandwich'?swCats():CATS).filter(([k])=>catVis(k)).map(([k,n])=>`<button class="tab ${S.cat===k?'on':''}" data-cat="${k}">${n}</button>`).join('')}</div>
   <div class="flex items-center gap-2 mt-2 h-11"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${sel?sel.n:'Торкніться інгредієнта'}</div><button class="stp" data-m aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${fg(q)} г</b><button class="stp" data-p aria-label="Більше">+</button><button class="bake" data-bake>У піч</button></div>
   <div class="row flex gap-2 overflow-x-auto mt-2 pb-1">${list.map(i=>`<button class="ing ${S.sel===i.id?'on':''}" data-ing="${i.id}">${thumb(i)}<span>${i.n}</span>${S.qty[i.id]?`<i class="bdg">${fg(S.qty[i.id])}</i>`:''}</button>`).join('')}</div>`;
   p.querySelector('.row').scrollLeft=keep}
  else if(S.phase==='bake')p.innerHTML='<div class="h-full flex flex-col items-center justify-center gap-2"><div class="text-lg font-extrabold">Випікання в дров’яній печі…</div><div class="text-sm text-slate-400">Сир плавиться, скоринка рум’яніє</div></div>';
  else if(S.phase==='cut')p.innerHTML=`<div class="text-center text-sm font-bold">Оберіть ніж для нарізання</div><div class="text-center text-xs text-slate-400 mt-1">Біла ручка — вегетаріанська піца, чорна — піца з м'ясом</div><div class="flex justify-around mt-4"><button class="knifeb" data-knife="white">${knife('white')}Білий ніж</button><button class="knifeb" data-knife="black">${knife('black')}Чорний ніж</button></div>`;
  else if(S.phase==='post'&&S.panType==='sandwich')p.innerHTML=`<div class="flex items-center gap-2 mt-5 h-12"><div class="flex-1 min-w-0 text-sm font-bold">Піца-сендвіч у коробці — закрийте її</div><button class="ready" data-ready>Готово</button></div>`;
- else if(S.phase==='post'){if(!fmtCfg().allowFinishingSauce)S.pcat='gr';const sc=S.pcat==='sauce'&&fmtCfg().allowFinishingSauce,cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';
-  p.innerHTML=`<div class="flex gap-2"><button class="tab ${!sc?'on':''}" data-pcat="gr">Зелень та спеції</button>${fmtCfg().allowFinishingSauce?`<button class="tab ${sc?'on':''}" data-pcat="sauce">Соус топінг</button>`:''}</div>
+ else if(S.phase==='post'){if(!fmtCfg().allowFinishingSauce||!TOPS.some(visIng))S.pcat='gr';const sc=S.pcat==='sauce'&&fmtCfg().allowFinishingSauce,cn=id=>S.drizzles.filter(d=>d.id===id).length,ps=pwSel(),pn=ps?(POST.find(x=>x.id===ps)||TOPS.find(x=>x.id===ps)).n:'';
+  p.innerHTML=`<div class="flex gap-2"><button class="tab ${!sc?'on':''}" data-pcat="gr">Зелень та спеції</button>${fmtCfg().allowFinishingSauce&&TOPS.some(visIng)?`<button class="tab ${sc?'on':''}" data-pcat="sauce">Соус топінг</button>`:''}</div>
   <div class="flex items-center gap-2 mt-2 h-12"><div class="flex-1 min-w-0 text-[13px] font-semibold leading-tight">${ps?pn:'Доткніться інгредієнта'}</div><button class="stp" data-pw="${ps||''}" data-d="-1" ${ps?'':'disabled'} aria-label="Менше">−</button><b class="w-12 text-center tabular-nums">${ps?pwG(ps):0} г</b><button class="stp" data-pw="${ps||''}" data-d="1" ${ps?'':'disabled'} aria-label="Більше">+</button><button class="ready" data-ready>Готово</button></div>
-  <div class="flex justify-around mt-2">${sc?TOPS.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
+  <div class="flex justify-around mt-2">${sc?TOPS.filter(visIng).map(i=>`<button class="ing ${ps===i.id?'on':''}" data-top="${i.id}" style="width:92px">${sauceThumb(i)}<span>${i.n}</span>${cn(i.id)?`<i class="bdg">×${cn(i.id)}</i>`:''}</button>`).join(''):POST.filter(visIng).map(i=>`<button class="ing ${ps===i.id?'on':''}" data-post="${i.id}" style="width:78px">${thumb(i)}<span>${i.n}</span>${S.post[i.id]?`<i class="bdg">${postG(i)}</i>`:''}</button>`).join('')}</div>`}
  else p.innerHTML='';
 }
 $('#panel').addEventListener('click',e=>{
@@ -2006,6 +2199,89 @@ $('#exitBtn').addEventListener('click',exitToMenu);
 refresh();panel();
 try{const t=sessionStorage.getItem('pzOpenPick');if(t){sessionStorage.removeItem('pzOpenPick');if(!ACTIVE_MODES.includes(modeStore.get()))RECIPES_READY.then(()=>openPick(t))}}catch(e){}   /* «Перейти до вибору піци» */
 if(ACTIVE_MODES.includes(modeStore.get())){currentGameMode=modeStore.get();FOCUS=focusStore.get();applyMode(currentGameMode);RECIPES_READY.then(showOrder)}   /* training continues in the selected mode: new order right after the reload */
+
+/* ---- live preview API: used by the admin «Налаштування графіки» tab (this file is embedded there; window.PZ_PREVIEW is set by the host) ---- */
+if(window.PZ_PREVIEW){window.pv={
+ async setup(fmt){   /* builds the real base of a format (dough + tomato sauce) with the game's own functions */
+  await RECIPES_READY;S.busy=0;const key={std:'M',k_pizza:'K',cupcakes:'C',sandwich:'W'}[fmt]||'M';
+  if(fmt==='std'){S.ns=false;S.size='M';S.hasCheeseRim=false;S.phase='sauce';refresh();await applySauce('tomato',$('#stage'))}
+  else{S.ns=true;S.panType=null;S.hasCheeseRim=false;S.size='K';['#nsK','#nsC','#nsW'].forEach(q=>$(q).style.opacity=0);checkSize(false);refresh();await startPan(key);let n=0;while(S.phase!=='sauce'&&n++<200)await wait(20);await applySauce('tomato',$('#stage'))}
+  let n=0;while((S.phase!=='build'||S.busy)&&n++<400)await wait(20);
+  return S.phase
+ },
+ show(items,gfx,book,seed,pos){   /* items: [{id,k}] k = multiple of the start weight; pieces come from the game's own count / layout / sprite code */
+  PV_SEED=seed||0;applyBookGfx(gfx,book,pos);
+  Object.keys(pcsL).forEach(k=>delete pcsL[k]);Object.keys(pcs).forEach(k=>delete pcs[k]);
+  ['#gIng','#gPost'].forEach(q=>{const g=$(q);if(g)g.innerHTML=''});
+  S.qty={};S.stack=[];S.post={};S.pw={};const ids=[];
+  (items||[]).forEach(({id,k})=>{const it=ING.find(i=>i.id===id)||POST.find(i=>i.id===id);if(!it)return;const g=Math.round(def(it)*(k||1)*10)/10;
+   if(it.cat){S.qty[id]=g;S.stack.push({id,g})}else{S.post[id]=true;S.pw[id]=g}ids.push(id)});
+  if(ids.length)sync(ids,null,'');
+  return ids.map(id=>[id,(pcs[id]||[]).length])
+ }
+}}
+
+/* ---- manual position editor (admin «Ручне позиціонування»): drag / rotate / add / remove the pieces of ONE ingredient on the real base ---- */
+if(window.PZ_PREVIEW){window.pv.edit=(()=>{
+ const E={id:null,arr:[],sel:-1,layer:null,ring:null,drag:null,ghost:[]};
+ const it0=id=>ING.find(i=>i.id===id)||POST.find(i=>i.id===id),exOf=id=>Math.min(EX[id]||8,13),sc=()=>gScale(E.id);
+ const emit=kind=>{try{parent.pmEvent&&parent.pmEvent({id:E.id,sel:E.sel,kind,arr:E.arr.map(q=>({...q}))})}catch(e){}};   /* kind: open | sel | live (dragging) | edit (committed change) */
+ const clear=()=>{Object.keys(pcsL).forEach(k=>delete pcsL[k]);Object.keys(pcs).forEach(k=>delete pcs[k]);['#gIng','#gPost'].forEach(q=>{const g=$(q);if(g)g.innerHTML=''});S.qty={};S.stack=[];S.post={};S.pw={};E.layer=E.ring=null};
+ const place=(c,q)=>{c.style.transition='none';c.style.opacity=1;c.style.transform=tf({x:q.x,y:q.y,r:q.r||0,s:(q.s||1)*sc()})};
+ const elOf=k=>E.layer?[...E.layer.querySelectorAll('.it')].find(c=>c._k===k):null;
+ const ringAt=()=>{const r=E.ring;if(!r)return;const q=E.arr[E.sel];if(!q){r.style.display='none';return}r.style.display='';r.setAttribute('cx',q.x);r.setAttribute('cy',q.y);r.setAttribute('r',(exOf(E.id)*(q.s||1)*sc()+4).toFixed(1))};
+ const loc=ev=>{const m=E.layer.getScreenCTM().inverse(),svg=E.layer.ownerSVGElement,pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;return pt.matrixTransform(m)};
+ function ghosts(ids){
+  const gi=[];(ids||[]).forEach(id=>{if(id===E.id)return;const it=it0(id);if(!it)return;const g=def(it);if(it.cat){S.qty[id]=g;S.stack.push({id,g})}else{S.post[id]=true;S.pw[id]=g}gi.push(id)});
+  if(gi.length){sync(gi,null,'');[...document.querySelectorAll('#gIng>.act,#gPost>.act')].forEach(l=>{l.style.opacity='.3';l.style.pointerEvents='none'})}
+ }
+ function draw(){
+  const host=POST.some(p=>p.id===E.id)?$('#gPost'):$('#gIng'),old=$('#pmLayer');if(old)old.remove();
+  const L=E.layer=mk('g',{id:'pmLayer'},host);
+  E.arr.forEach((q,k)=>{const c=mk('g',{class:'it'},L);c._k=k;c._i=k;fillSprite(c,E.id,k);mk('circle',{r:Math.max(exOf(E.id)*1.15,6),fill:'transparent'},c);place(c,q);c.style.cursor='grab';c.style.touchAction='none';c.setAttribute('draggable','false');c.addEventListener('pointerdown',ev=>down(ev,c));c.addEventListener('dragstart',ev=>ev.preventDefault())});
+  E.ring=mk('circle',{fill:'none',stroke:'#fff','stroke-width':'1.8','stroke-dasharray':'4 3'},L);E.ring.setAttribute('class','pmRing');E.ring.setAttribute('pointer-events','none');E.ring.style.setProperty('pointer-events','none','important');
+  const at=E.layer.querySelectorAll('.it');if(E.sel>=0&&at[E.sel])at[E.sel].style.filter='drop-shadow(0 0 3px #fff) drop-shadow(0 0 2px #f97316)';
+  ringAt();
+ }
+ function down(ev,c){
+  ev.preventDefault();ev.stopPropagation();if(E.drag){try{E.drag.c.releasePointerCapture(E.drag.id)}catch(_){}E.drag=null}select(c._k,true);const q=E.arr[c._k],p0=loc(ev);
+  E.drag={k:c._k,c,id:ev.pointerId,dx:q.x-p0.x,dy:q.y-p0.y};try{c.setPointerCapture(ev.pointerId)}catch(_){}c.style.cursor='grabbing';
+  c.onpointermove=e=>{if(!E.drag)return;const p=loc(e),it=it0(E.id),qq=E.arr[E.drag.k],[x,y]=clampFmt(it,p.x+E.drag.dx,p.y+E.drag.dy,(qq.s||1)*sc(),curFmt());qq.x=+x.toFixed(1);qq.y=+y.toFixed(1);E.drag.moved=true;place(c,qq);ringAt();emit('live')};
+  c.onpointerup=c.onpointercancel=e=>{if(!E.drag)return;const mv=E.drag.moved;E.drag=null;c.style.cursor='grab';try{c.releasePointerCapture(e.pointerId)}catch(_){}c.onpointermove=c.onpointerup=c.onpointercancel=null;emit(mv?'edit':'sel')};
+ }
+ function select(k,noEmit){
+  E.sel=k;if(E.layer)E.layer.querySelectorAll('.it').forEach(c=>{const on=c._k===k;c.style.filter=on?'drop-shadow(0 0 3px #fff) drop-shadow(0 0 2px #f97316)':'';if(on&&c.nextSibling!==E.ring)E.layer.insertBefore(c,E.ring)});
+  ringAt();emit('sel');
+ }
+ function procedural(){   /* what the game would draw for this ingredient at its start weight (patterns / custom count included) */
+  const it=it0(E.id);PV_NOPOS=true;LAY_CACHE.clear();let n;
+  if(it.cat)n=cntG(it,def(it));else{S.post[E.id]=true;S.pw[E.id]=def(it);n=cnt(it);delete S.post[E.id];delete S.pw[E.id]}
+  const P=posForL(it,n,0).map(p=>({...p}));PV_NOPOS=false;LAY_CACHE.clear();const s0=sc();
+  return P.map(p=>({x:+p.x.toFixed(1),y:+p.y.toFixed(1),r:+((((p.r||0)%360)+360)%360).toFixed(1),s:+((p.s||1)/s0).toFixed(2)}));
+ }
+ function rebuild(){clear();ghosts(E.ghost);draw()}
+ return{
+  open(id,saved,ghostIds,gfx,book,pos){
+   applyBookGfx(gfx,book,pos);E.id=id;E.sel=-1;E.ghost=ghostIds||[];clear();
+   E.arr=saved&&saved.length?saved.map(q=>({x:q.x,y:q.y,r:q.r||0,s:q.s||1})):procedural();
+   ghosts(E.ghost);draw();emit('open');return{saved:!!(saved&&saved.length),n:E.arr.length}
+  },
+  setGhost(ids){E.ghost=ids||[];rebuild()},
+  select(k){select(k)},
+  turn(k,d){const q=E.arr[k];if(!q)return;q.r=+((((q.r||0)+d)%360+360)%360).toFixed(1);rebuild();emit('edit')},
+  setRot(k,v,live){const q=E.arr[k];if(!q)return;q.r=+(((+v%360)+360)%360).toFixed(1);const c=elOf(k);c&&place(c,q);ringAt();emit(live?'live':'edit')},
+  setScale(k,v,live){const q=E.arr[k];if(!q)return;q.s=+Math.max(.3,Math.min(3,+v)).toFixed(2);const c=elOf(k);c&&place(c,q);ringAt();emit(live?'live':'edit')},
+  add(){
+   const it=it0(E.id),fk=curFmt(),D=gfxDomain(it,sc(),fk);let best=null,bd=-1;
+   for(let t=0;t<60;t++){const u=rnd(E.arr.length*7.7+t*1.9+3),v=rnd(E.arr.length*3.1+t*2.3+9);let x,y;
+    if(D.disc){const r=D.hw*Math.sqrt(u),a=6.2832*v;x=D.cx+r*Math.cos(a);y=D.cy+r*Math.sin(a)}else{x=D.cx+(u*2-1)*D.hw;y=D.cy+(v*2-1)*D.hh}
+    [x,y]=clampFmt(it,x,y,sc(),fk);const dm=E.arr.reduce((m,q)=>Math.min(m,Math.hypot(q.x-x,q.y-y)),1e9);if(dm>bd){bd=dm;best=[x,y]}}
+   E.arr.push({x:+best[0].toFixed(1),y:+best[1].toFixed(1),r:+(rnd(E.arr.length*5.3)*360).toFixed(1),s:1});E.sel=E.arr.length-1;rebuild();emit('edit');return E.arr.length
+  },
+  remove(k){if(E.arr.length<2)return E.arr.length;if(k===undefined||k<0||!E.arr[k])k=E.arr.length-1;E.arr.splice(k,1);E.sel=-1;rebuild();emit('edit');return E.arr.length},
+  get(){return E.arr.map(q=>({...q}))}
+ }
+})()}
 </script>
 </body>
 </html>
